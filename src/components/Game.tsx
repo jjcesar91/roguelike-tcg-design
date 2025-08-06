@@ -8,7 +8,8 @@ import { Card as CardComponent, CardContent, CardDescription, CardHeader, CardTi
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Heart, Shield, Zap, Crown, Skull, Swords, TrendingDown, AlertTriangle, TrendingUp, Target } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Heart, Shield, Zap, Crown, Skull, Swords, TrendingDown, AlertTriangle, TrendingUp, Target, Archive, Layers } from 'lucide-react';
 
 export default function Game() {
   const [gameState, setGameState] = useState<GameState>({
@@ -27,6 +28,8 @@ export default function Game() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [selectedReplaceCard, setSelectedReplaceCard] = useState<string | null>(null);
   const [selectedPassive, setSelectedPassive] = useState<string | null>(null);
+  const [showDeckModal, setShowDeckModal] = useState(false);
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
 
   // Add useEffect to monitor game state changes
   useEffect(() => {
@@ -422,11 +425,62 @@ export default function Game() {
         </div>
 
         {/* Turn Indicator */}
-        <Alert>
-          <AlertDescription>
-            {battleState.turn === 'player' ? 'Your turn - Play cards!' : `${currentOpponent.name}'s turn`}
-          </AlertDescription>
-        </Alert>
+        <div className="w-full bg-muted border border-border rounded-lg p-4">
+          <div className="flex justify-between items-center w-full">
+            <div className="text-sm font-medium">
+              {battleState.turn === 'player' ? 'Your turn - Play cards!' : `${currentOpponent.name}'s turn`}
+            </div>
+            <div className="flex gap-2">
+              <Dialog open={showDeckModal} onOpenChange={setShowDeckModal}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Layers className="w-4 h-4" />
+                    Deck ({battleState.playerDeck.cards.length})
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Your Deck</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">{battleState.playerDeck.cards.length} cards remaining</p>
+                    <div className="max-h-64 overflow-y-auto space-y-1">
+                      {battleState.playerDeck.cards.map((card, index) => (
+                        <div key={index} className="text-sm p-2 bg-muted rounded">
+                          {card.name} ({card.cost}) - {card.effect}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={showDiscardModal} onOpenChange={setShowDiscardModal}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Archive className="w-4 h-4" />
+                    Discard ({battleState.playerDiscardPile.length})
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Your Discard Pile</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">{battleState.playerDiscardPile.length} cards discarded</p>
+                    <div className="max-h-64 overflow-y-auto space-y-1">
+                      {battleState.playerDiscardPile.map((card, index) => (
+                        <div key={index} className="text-sm p-2 bg-muted rounded">
+                          {card.name} ({card.cost}) - {card.effect}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+        </div>
 
         {/* Battle Log */}
         <div className="bg-muted p-4 rounded-lg max-h-32 overflow-y-auto">
@@ -470,47 +524,6 @@ export default function Game() {
                 </CardContent>
               </CardComponent>
             ))}
-          </div>
-        </div>
-
-        {/* Deck and Discard Pile Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-semibold mb-2">Your Discard Pile</h4>
-            <p className="text-sm text-muted-foreground">{battleState.playerDiscardPile.length} cards discarded</p>
-            {battleState.playerDiscardPile.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {battleState.playerDiscardPile.slice(-3).map((card, index) => (
-                  <div key={index} className="text-xs">
-                    {card.name} ({card.cost})
-                  </div>
-                ))}
-                {battleState.playerDiscardPile.length > 3 && (
-                  <div className="text-xs text-muted-foreground">
-                    ...and {battleState.playerDiscardPile.length - 3} more
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          
-          <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-semibold mb-2">Your Deck</h4>
-            <p className="text-sm text-muted-foreground">{battleState.playerDeck.cards.length} cards remaining</p>
-            {battleState.playerDeck.cards.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {battleState.playerDeck.cards.slice(-3).map((card, index) => (
-                  <div key={index} className="text-xs">
-                    {card.name} ({card.cost})
-                  </div>
-                ))}
-                {battleState.playerDeck.cards.length > 3 && (
-                  <div className="text-xs text-muted-foreground">
-                    ...and {battleState.playerDeck.cards.length - 3} more
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
