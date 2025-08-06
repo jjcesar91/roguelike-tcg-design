@@ -150,10 +150,10 @@ export function calculateDamageWithStatusEffects(damage: number, attackerStatusE
     finalDamage = Math.floor(finalDamage * (1 - (0.25 * weakEffect.value)));
   }
   
-  // Apply Vulnerable effect (increases damage taken by 50% per stack)
+  // Apply Vulnerable effect (increases damage taken by 50% if present)
   const vulnerableEffect = defenderStatusEffects.find(effect => effect.type === 'vulnerable');
   if (vulnerableEffect) {
-    finalDamage = Math.floor(finalDamage * (1 + (0.5 * vulnerableEffect.value)));
+    finalDamage = Math.floor(finalDamage * 1.5);
   }
   
   // Apply Strength effect (increases damage dealt by 3 per stack)

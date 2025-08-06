@@ -371,51 +371,53 @@ export default function Game() {
     return (
       <div className="space-y-6">
         {/* Battle Header */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <div className="font-semibold capitalize flex items-center gap-2">
-                {player.class === 'warrior' && <Swords className="w-5 h-5" />}
-                {player.class === 'rogue' && <Skull className="w-5 h-5" />}
-                {player.class === 'wizard' && <Zap className="w-5 h-5" />}
-                {player.class}
-              </div>
-              <div className="flex items-center gap-2">
-                <Heart className="w-4 h-4 text-red-500" />
-                <span>{player.health}/{player.maxHealth}</span>
-              </div>
-              <Progress value={(player.health / player.maxHealth) * 100} className="w-24" />
-              {battleState.playerBlock > 0 && (
-                <div className="flex items-center gap-2 mt-1">
-                  <Shield className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm text-blue-600">{battleState.playerBlock} Block</span>
-                </div>
-              )}
-              {renderStatusEffects(battleState.playerStatusEffects, "Player Effects")}
+        <div className="flex flex-row justify-between items-start w-full">
+          {/* Player Stats - Left Aligned */}
+          <div className="text-left">
+            <div className="font-semibold capitalize flex items-center gap-2">
+              {player.class === 'warrior' && <Swords className="w-5 h-5" />}
+              {player.class === 'rogue' && <Skull className="w-5 h-5" />}
+              {player.class === 'wizard' && <Zap className="w-5 h-5" />}
+              {player.class}
+              <Badge variant="outline" className="text-xs">Level {player.level}</Badge>
             </div>
-            <div className="text-2xl font-bold">VS</div>
-            <div className="text-center">
-              <div className="font-semibold">{currentOpponent.name}</div>
-              <div className="flex items-center gap-2">
-                <Heart className="w-4 h-4 text-red-500" />
-                <span>{currentOpponent.health}/{currentOpponent.maxHealth}</span>
+            <div className="flex items-center gap-2">
+              <Heart className="w-4 h-4 text-red-500" />
+              <span>{player.health}/{player.maxHealth}</span>
+            </div>
+            <Progress value={(player.health / player.maxHealth) * 100} className="w-24" />
+            {battleState.playerBlock > 0 && (
+              <div className="flex items-center gap-2 mt-1">
+                <Shield className="w-4 h-4 text-blue-500" />
+                <span className="text-sm text-blue-600">{battleState.playerBlock} Block</span>
               </div>
-              <Progress value={(currentOpponent.health / currentOpponent.maxHealth) * 100} className="w-24" />
-              {battleState.opponentBlock > 0 && (
-                <div className="flex items-center gap-2 mt-1">
-                  <Shield className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm text-blue-600">{battleState.opponentBlock} Block</span>
-                </div>
-              )}
-              {renderStatusEffects(battleState.opponentStatusEffects, "Opponent Effects")}
+            )}
+            {renderStatusEffects(battleState.playerStatusEffects, true, "Player Effects")}
+            <div className="flex items-center gap-1 mt-2">
+              {Array.from({ length: battleState.playerEnergy }, (_, i) => (
+                <Zap key={i} className="w-4 h-4 text-blue-500" />
+              ))}
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-blue-500" />
-              <span>{battleState.playerEnergy} Energy</span>
+
+          {/* VS - Center */}
+          <div className="text-2xl font-bold flex items-center">VS</div>
+
+          {/* Monster Stats - Right Aligned */}
+          <div className="text-right">
+            <div className="font-semibold">{currentOpponent.name}</div>
+            <div className="flex items-center justify-end gap-2">
+              <span>{currentOpponent.health}/{currentOpponent.maxHealth}</span>
+              <Heart className="w-4 h-4 text-red-500" />
             </div>
-            <Badge variant="outline">Level {player.level}</Badge>
+            <Progress value={(currentOpponent.health / currentOpponent.maxHealth) * 100} className="w-24 ml-auto" />
+            {battleState.opponentBlock > 0 && (
+              <div className="flex items-center justify-end gap-2 mt-1">
+                <span className="text-sm text-blue-600">{battleState.opponentBlock} Block</span>
+                <Shield className="w-4 h-4 text-blue-500" />
+              </div>
+            )}
+            {renderStatusEffects(battleState.opponentStatusEffects, false)}
           </div>
         </div>
 
@@ -740,12 +742,14 @@ export default function Game() {
     return energy >= card.cost;
   };
 
-  const renderStatusEffects = (effects: any[], title: string) => {
+  const renderStatusEffects = (effects: any[], showTitle: boolean = true, title?: string) => {
     if (effects.length === 0) return null;
 
     return (
       <div className="mt-2">
-        <h4 className="text-xs font-semibold text-muted-foreground mb-1">{title}</h4>
+        {showTitle && title && (
+          <h4 className="text-xs font-semibold text-muted-foreground mb-1">{title}</h4>
+        )}
         <div className="flex flex-wrap gap-1">
           {effects.map((effect, index) => (
             <Badge key={index} variant="secondary" className="text-xs">
@@ -753,7 +757,7 @@ export default function Game() {
               {effect.type === 'vulnerable' && <AlertTriangle className="w-3 h-3 mr-1" />}
               {effect.type === 'strength' && <TrendingUp className="w-3 h-3 mr-1" />}
               {effect.type === 'dexterity' && <Target className="w-3 h-3 mr-1" />}
-              {effect.type} {effect.value} ({effect.duration})
+              {effect.type} {effect.value} ({effect.duration - 1})
             </Badge>
           ))}
         </div>
