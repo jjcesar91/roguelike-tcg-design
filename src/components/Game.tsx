@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Player, Opponent, GameState, PlayerClass, BattleState } from '@/types/game';
-import { createPlayer, getRandomOpponent, initializeBattle, playCard, opponentPlayCard, endTurn, getRandomCards, getRandomPassives, replaceCardInDeck, checkVictory, checkDefeat, drawCardsWithReshuffle } from '@/lib/gameUtils';
+import { Card, Player, Opponent, GameState, PlayerClass, BattleState, CardType } from '@/types/game';
+import { createPlayer, getRandomOpponent, initializeBattle, playCard, opponentPlayCard, endTurn, getRandomCards, getRandomPassives, replaceCardInDeck, checkVictory, checkDefeat, drawCardsWithReshuffle, getCardCost, canPlayCard as canPlayCardUtil } from '@/lib/gameUtils';
 import { Button } from '@/components/ui/button';
 import { Card as CardComponent, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Heart, Shield, Zap, Crown, Skull, Swords, TrendingDown, AlertTriangle, TrendingUp, Target, Archive, Layers } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Heart, Shield, Zap, Crown, Skull, Swords, TrendingDown, AlertTriangle, TrendingUp, Target, Archive, Layers, Star, Zap as Bolt, Hand } from 'lucide-react';
 
 export default function Game() {
   const [gameState, setGameState] = useState<GameState>({
@@ -28,6 +29,8 @@ export default function Game() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [selectedReplaceCard, setSelectedReplaceCard] = useState<string | null>(null);
   const [selectedPassive, setSelectedPassive] = useState<string | null>(null);
+  const [showSplashScreen, setShowSplashScreen] = useState(false);
+  const [splashOpponent, setSplashOpponent] = useState<Opponent | null>(null);
   const [showDeckModal, setShowDeckModal] = useState(false);
   const [showDiscardModal, setShowDiscardModal] = useState(false);
 
@@ -36,6 +39,17 @@ export default function Game() {
     console.log('Game state changed:', gameState);
     console.log('Current game phase:', gameState.gamePhase);
   }, [gameState]);
+
+  const showBattleSplash = (opponent: Opponent) => {
+    setSplashOpponent(opponent);
+    setShowSplashScreen(true);
+    
+    // Auto-hide after 2 seconds
+    setTimeout(() => {
+      setShowSplashScreen(false);
+      setSplashOpponent(null);
+    }, 2000);
+  };
 
   const handleClassSelect = (playerClass: PlayerClass) => {
     console.log('handleClassSelect called with:', playerClass);
@@ -78,6 +92,9 @@ export default function Game() {
       
       setGameState(newGameState);
       setSelectedClass(playerClass);
+      
+      // Show splash screen
+      showBattleSplash(opponent);
       
       // Force a re-render by logging immediately after
       setTimeout(() => {
@@ -267,6 +284,9 @@ export default function Game() {
 
     setSelectedCard(null);
     setSelectedReplaceCard(null);
+    
+    // Show splash screen
+    showBattleSplash(opponent);
   };
 
   const handlePassiveSelect = (passive: any) => {
@@ -305,9 +325,25 @@ export default function Game() {
     setSelectedPassive(null);
   };
 
+  // Add portrait mappings
+  const playerPortraits = {
+    warrior: "https://i.imgur.com/UDCcD6u.png",
+    rogue: "https://i.imgur.com/dR6vXfK.png",
+    wizard: "https://i.imgur.com/ti7tvRs.png"
+  };
+
+  const opponentPortraits = {
+    'goblin Warrior': "https://i.imgur.com/oC9kaes.png",
+    'alpha Wolf': "https://i.imgur.com/By58IEi.png",
+    'skeleton Lord': "https://i.imgur.com/k14VZr1.png",
+    'bandit Leader': "https://i.imgur.com/VmoKR49.png",
+    'ancient Dragon': "https://i.imgur.com/701zzec.png",
+    'lich King': "https://i.imgur.com/tGEbCEd.png"
+  };
+
   const renderClassSelection = () => (
     <div className="flex flex-col items-center gap-8">
-      <h1 className="text-4xl font-bold text-center">Choose Your Class</h1>
+      <h1 className="text-4xl font-bold text-center game-title">Choose Your Class</h1>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {(['warrior', 'rogue', 'wizard'] as PlayerClass[]).map((playerClass) => (
           <button
@@ -321,18 +357,59 @@ export default function Game() {
             disabled={playerClass !== 'warrior'}
             className={`p-4 border-2 rounded-lg transition-colors ${
               playerClass === 'warrior' 
-                ? 'border-gray-300 hover:border-blue-500 hover:bg-blue-50 cursor-pointer' 
-                : 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
+                ? 'border-amber-700 hover:border-amber-800 hover:bg-amber-100 cursor-pointer' 
+                : 'border-amber-400 bg-background opacity-60 cursor-not-allowed'
             }`}
           >
             <div className="text-center">
+              {/* Class Portrait */}
+              <div className="mb-4 flex justify-center">
+                <div className="w-32 h-32 rounded-lg overflow-hidden bg-background flex items-center justify-center">
+                  {playerClass === 'warrior' && (
+                    <img 
+                      src="https://i.imgur.com/UDCcD6u.png" 
+                      alt="Warrior Portrait" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400"><Swords className="w-16 h-16" /></div>';
+                      }}
+                    />
+                  )}
+                  {playerClass === 'rogue' && (
+                    <img 
+                      src="https://i.imgur.com/dR6vXfK.png" 
+                      alt="Rogue Portrait" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400"><Skull className="w-16 h-16" /></div>';
+                      }}
+                    />
+                  )}
+                  {playerClass === 'wizard' && (
+                    <img 
+                      src="https://i.imgur.com/ti7tvRs.png" 
+                      alt="Wizard Portrait" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400"><Zap className="w-16 h-16" /></div>';
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
               <div className="capitalize flex items-center justify-center gap-2 text-xl font-bold mb-2">
                 {playerClass === 'warrior' && <Swords className="w-6 h-6" />}
                 {playerClass === 'rogue' && <Skull className="w-6 h-6" />}
                 {playerClass === 'wizard' && <Zap className="w-6 h-6" />}
                 {playerClass}
                 {playerClass !== 'warrior' && (
-                  <span className="text-xs bg-red-500 text-white px-2 py-1 rounded">Coming Soon</span>
+                  <span className="text-xs bg-red-500 text-white px-2 py-1 rounded">Coming soon</span>
                 )}
               </div>
               <p className="text-sm text-muted-foreground mb-4">
@@ -341,7 +418,7 @@ export default function Game() {
                 {playerClass === 'wizard' && 'Wielder of arcane powers'}
               </p>
               <div className="space-y-2">
-                <h4 className="font-semibold">Starting Cards:</h4>
+                <h4 className="font-semibold card-title">Starting Cards:</h4>
                 <div className="space-y-1">
                   <div className="text-sm">• Strike - Deal 6 damage</div>
                   <div className="text-sm">• Defend - Gain 5 block</div>
@@ -377,7 +454,25 @@ export default function Game() {
         <div className="flex flex-row justify-between items-start w-full">
           {/* Player Stats - Left Aligned */}
           <div className="text-left">
-            <div className="font-semibold capitalize flex items-center gap-2">
+            {/* Player Portrait */}
+            <div className="mb-2 flex justify-center">
+              <div className="w-16 h-16 rounded-lg overflow-hidden bg-amber-50 flex items-center justify-center">
+                <img 
+                  src={playerPortraits[player.class]} 
+                  alt={`${player.class} Portrait`} 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const fallbackIcon = player.class === 'warrior' ? <Swords className="w-8 h-8" /> : 
+                                       player.class === 'rogue' ? <Skull className="w-8 h-8" /> : 
+                                       <Zap className="w-8 h-8" />;
+                    target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center text-gray-400"></div>`;
+                  }}
+                />
+              </div>
+            </div>
+            <div className="font-semibold card-title capitalize flex items-center gap-2">
               {player.class === 'warrior' && <Swords className="w-5 h-5" />}
               {player.class === 'rogue' && <Skull className="w-5 h-5" />}
               {player.class === 'wizard' && <Zap className="w-5 h-5" />}
@@ -404,11 +499,26 @@ export default function Game() {
           </div>
 
           {/* VS - Center */}
-          <div className="text-2xl font-bold flex items-center">VS</div>
+          <div className="text-2xl font-bold fantasy-text flex items-center">Vs</div>
 
           {/* Monster Stats - Right Aligned */}
           <div className="text-right">
-            <div className="font-semibold">{currentOpponent.name}</div>
+            {/* Opponent Portrait */}
+            <div className="mb-2 flex justify-center">
+              <div className="w-16 h-16 rounded-lg overflow-hidden bg-amber-50 flex items-center justify-center">
+                <img 
+                  src={opponentPortraits[currentOpponent.name as keyof typeof opponentPortraits]} 
+                  alt={`${currentOpponent.name} Portrait`} 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400"><Skull className="w-8 h-8" /></div>';
+                  }}
+                />
+              </div>
+            </div>
+            <div className="font-semibold card-title">{currentOpponent.name}</div>
             <div className="flex items-center justify-end gap-2">
               <span>{currentOpponent.health}/{currentOpponent.maxHealth}</span>
               <Heart className="w-4 h-4 text-red-500" />
@@ -491,36 +601,25 @@ export default function Game() {
 
         {/* Player Hand */}
         <div>
-          <h3 className="text-lg font-semibold mb-4">Your Hand ({battleState.playerHand.length}/5)</h3>
+          <h3 className="text-lg font-semibold card-title mb-4">Your Hand ({battleState.playerHand.length}/5)</h3>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {battleState.playerHand.map((card, index) => (
               <CardComponent 
                 key={index} 
                 className={`cursor-pointer hover:shadow-md transition-all ${
-                  !canPlayCard(card, player, battleState.playerEnergy) ? 'opacity-50' : ''
+                  !canPlayCardUtil(card, player, battleState.playerEnergy) ? 'opacity-50' : ''
                 } ${battleState.turn === 'player' ? 'hover:scale-105' : ''}`}
-                onClick={() => battleState.turn === 'player' && canPlayCard(card, player, battleState.playerEnergy) && handleCardPlay(card)}
+                onClick={() => battleState.turn === 'player' && canPlayCardUtil(card, player, battleState.playerEnergy) && handleCardPlay(card)}
               >
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-sm">{card.name}</CardTitle>
-                    <Badge variant="outline" className="text-xs">{card.cost}</Badge>
+                    {renderEnergyCost(card.cost, card, player)}
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {renderCardTypes(card.types)}
                   <CardDescription className="text-xs">{card.description}</CardDescription>
-                  {card.attack && (
-                    <div className="flex items-center gap-1 mt-2">
-                      <Swords className="w-3 h-3 text-red-500" />
-                      <span className="text-xs">{card.attack}</span>
-                    </div>
-                  )}
-                  {card.defense && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Shield className="w-3 h-3 text-blue-500" />
-                      <span className="text-xs">{card.defense}</span>
-                    </div>
-                  )}
                 </CardContent>
               </CardComponent>
             ))}
@@ -550,13 +649,13 @@ export default function Game() {
     return (
       <div className="space-y-6">
         <div className="text-center">
-          <h2 className="text-2xl font-bold">Choose a New Card</h2>
+          <h2 className="text-2xl font-bold game-title">Choose a New Card</h2>
           <p className="text-muted-foreground mt-2">Select a new card to add to your deck</p>
         </div>
         
         {/* Available Cards */}
         <div>
-          <h3 className="text-lg font-semibold mb-4">Available Cards</h3>
+          <h3 className="text-lg font-semibold card-title mb-4">Available Cards</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {gameState.availableCards.map((card, index) => (
               <CardComponent 
@@ -568,9 +667,12 @@ export default function Game() {
               >
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{card.name}</CardTitle>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {card.name}
+                      {renderCardTypes(card.types)}
+                    </CardTitle>
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline">{card.cost}</Badge>
+                      {renderEnergyCost(card.cost)}
                       <Badge variant={card.rarity === 'rare' ? 'default' : 'secondary'}>
                         {card.rarity}
                       </Badge>
@@ -579,25 +681,11 @@ export default function Game() {
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="text-sm mb-3">{card.description}</CardDescription>
-                  <div className="space-y-2">
-                    {card.attack && (
-                      <div className="flex items-center gap-2">
-                        <Swords className="w-4 h-4 text-red-500" />
-                        <span className="text-sm font-medium">{card.attack} Damage</span>
-                      </div>
-                    )}
-                    {card.defense && (
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-blue-500" />
-                        <span className="text-sm font-medium">{card.defense} Block</span>
-                      </div>
-                    )}
-                    {card.effect && (
-                      <div className="text-xs text-muted-foreground italic">
-                        Effect: {card.effect}
-                      </div>
-                    )}
-                  </div>
+                  {card.effect && (
+                    <div className="text-xs text-muted-foreground italic">
+                      Effect: {card.effect}
+                    </div>
+                  )}
                 </CardContent>
               </CardComponent>
             ))}
@@ -607,7 +695,7 @@ export default function Game() {
         {/* Current Deck - Cards to Replace */}
         {selectedCard && (
           <div>
-            <h3 className="text-lg font-semibold mb-4">Choose Card to Replace</h3>
+            <h3 className="text-lg font-semibold card-title mb-4">Choose Card to Replace</h3>
             <p className="text-sm text-muted-foreground mb-4">
               Select one of your current cards to replace. All 3 copies will be removed.
             </p>
@@ -623,30 +711,16 @@ export default function Game() {
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <CardTitle className="text-lg">{card.name}</CardTitle>
-                      <Badge variant="outline">{card.cost}</Badge>
+                      {renderEnergyCost(card.cost)}
                     </div>
                   </CardHeader>
                   <CardContent>
                     <CardDescription className="text-sm mb-3">{card.description}</CardDescription>
-                    <div className="space-y-2">
-                      {card.attack && (
-                        <div className="flex items-center gap-2">
-                          <Swords className="w-4 h-4 text-red-500" />
-                          <span className="text-sm font-medium">{card.attack} Damage</span>
-                        </div>
-                      )}
-                      {card.defense && (
-                        <div className="flex items-center gap-2">
-                          <Shield className="w-4 h-4 text-blue-500" />
-                          <span className="text-sm font-medium">{card.defense} Block</span>
-                        </div>
-                      )}
-                      {card.effect && (
-                        <div className="text-xs text-muted-foreground italic">
-                          Effect: {card.effect}
-                        </div>
-                      )}
-                    </div>
+                    {card.effect && (
+                      <div className="text-xs text-muted-foreground italic">
+                        Effect: {card.effect}
+                      </div>
+                    )}
                   </CardContent>
                 </CardComponent>
               ))}
@@ -678,7 +752,7 @@ export default function Game() {
     return (
       <div className="space-y-6">
         <div className="text-center">
-          <h2 className="text-2xl font-bold">Choose a Passive Ability</h2>
+          <h2 className="text-2xl font-bold game-title">Choose a Passive Ability</h2>
           <p className="text-muted-foreground mt-2">
             Select a permanent passive ability that will enhance your deck
           </p>
@@ -732,7 +806,7 @@ export default function Game() {
   const renderVictory = () => (
     <div className="text-center space-y-6">
       <div className="text-6xl">🎉</div>
-      <h1 className="text-4xl font-bold">Victory!</h1>
+      <h1 className="text-4xl font-bold game-title">Victory!</h1>
       <p className="text-xl">Congratulations! You have conquered all challenges!</p>
       <Button onClick={handleRestart} size="lg">
         Play Again
@@ -743,17 +817,13 @@ export default function Game() {
   const renderDefeat = () => (
     <div className="text-center space-y-6">
       <div className="text-6xl">💀</div>
-      <h1 className="text-4xl font-bold">Defeat</h1>
+      <h1 className="text-4xl font-bold game-title">Defeat</h1>
       <p className="text-xl">You have been defeated. Better luck next time!</p>
       <Button onClick={handleRestart} size="lg">
         Try Again
       </Button>
     </div>
   );
-
-  const canPlayCard = (card: Card, player: Player, energy: number) => {
-    return energy >= card.cost;
-  };
 
   const renderStatusEffects = (effects: any[], showTitle: boolean = true, title?: string) => {
     if (effects.length === 0) return null;
@@ -778,14 +848,128 @@ export default function Game() {
     );
   };
 
+  const renderCardTypes = (types: CardType[] | undefined) => {
+    if (!types || types.length === 0) return null;
+
+    const getTypeColor = (type: CardType) => {
+      switch (type) {
+        case CardType.MELEE:
+          return 'bg-red-800 text-red-100 border-red-900';
+        case CardType.ATTACK:
+          return 'bg-orange-800 text-orange-100 border-orange-900';
+        case CardType.SKILL:
+          return 'bg-blue-800 text-blue-100 border-blue-900';
+        case CardType.POWER:
+          return 'bg-purple-800 text-purple-100 border-purple-900';
+        case CardType.CURSE:
+          return 'bg-amber-800 text-amber-100 border-amber-900';
+        default:
+          return 'bg-amber-800 text-amber-100 border-amber-900';
+      }
+    };
+
+    const getTypeIcon = (type: CardType) => {
+      switch (type) {
+        case CardType.MELEE:
+          return <Hand className="w-3 h-3" />;
+        case CardType.ATTACK:
+          return <Swords className="w-3 h-3" />;
+        case CardType.SKILL:
+          return <Star className="w-3 h-3" />;
+        case CardType.POWER:
+          return <Crown className="w-3 h-3" />;
+        case CardType.CURSE:
+          return <Skull className="w-3 h-3" />;
+        default:
+          return null;
+      }
+    };
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        {types.map((type, index) => (
+          <Tooltip key={index}>
+            <TooltipTrigger>
+              <div className={`p-1 rounded ${getTypeColor(type)} cursor-help`}>
+                {getTypeIcon(type)}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <span className="capitalize">{type}</span>
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
+    );
+  };
+
+  const renderEnergyCost = (cost: number, card?: Card, player?: Player) => {
+    // If card and player are provided, calculate the discounted cost
+    const actualCost = card && player ? getCardCost(card, player) : cost;
+    return (
+      <div className="flex items-center gap-1">
+        {Array.from({ length: actualCost }, (_, i) => (
+          <Zap key={i} className="w-3 h-3 text-blue-500" />
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <div className="container mx-auto p-4 max-w-6xl">
-      {gameState.gamePhase === 'class-selection' && renderClassSelection()}
-      {gameState.gamePhase === 'battle' && renderBattle()}
-      {gameState.gamePhase === 'card-selection' && renderCardSelection()}
-      {gameState.gamePhase === 'passive-selection' && renderPassiveSelection()}
-      {gameState.gamePhase === 'victory' && renderVictory()}
-      {gameState.gamePhase === 'defeat' && renderDefeat()}
-    </div>
+    <TooltipProvider>
+      <div className="container mx-auto p-4 max-w-6xl">
+        {/* Splash Screen */}
+        {showSplashScreen && splashOpponent && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 transition-opacity duration-500">
+            <div className="text-center space-y-6">
+              {/* Opponent Portrait */}
+              <div className="flex justify-center">
+                <div className="w-48 h-48 rounded-lg overflow-hidden bg-amber-50 flex items-center justify-center border-4 border-amber-700">
+                  <img 
+                    src={opponentPortraits[splashOpponent.name]} 
+                    alt={`${splashOpponent.name} Portrait`} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400"><Skull className="w-24 h-24" /></div>';
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {/* Opponent Name */}
+              <h1 className="text-4xl font-bold game-title text-amber-100">
+                {splashOpponent.name}
+              </h1>
+              
+              {/* Difficulty Level */}
+              <div className="flex justify-center">
+                <Badge 
+                  variant="outline" 
+                  className={`
+                    text-lg px-6 py-3 border-2 font-bold
+                    ${splashOpponent.difficulty === 'basic' ? 'border-green-500 text-green-300' : ''}
+                    ${splashOpponent.difficulty === 'medium' ? 'border-yellow-500 text-yellow-300' : ''}
+                    ${splashOpponent.difficulty === 'boss' ? 'border-red-500 text-red-300' : ''}
+                  `}
+                >
+                  {splashOpponent.difficulty === 'basic' && 'EASY'}
+                  {splashOpponent.difficulty === 'medium' && 'MEDIUM'}
+                  {splashOpponent.difficulty === 'boss' && 'BOSS'}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {gameState.gamePhase === 'class-selection' && renderClassSelection()}
+        {gameState.gamePhase === 'battle' && renderBattle()}
+        {gameState.gamePhase === 'card-selection' && renderCardSelection()}
+        {gameState.gamePhase === 'passive-selection' && renderPassiveSelection()}
+        {gameState.gamePhase === 'victory' && renderVictory()}
+        {gameState.gamePhase === 'defeat' && renderDefeat()}
+      </div>
+    </TooltipProvider>
   );
 }

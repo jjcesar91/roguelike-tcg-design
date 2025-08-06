@@ -1,3 +1,11 @@
+export enum CardType {
+  MELEE = 'melee',
+  ATTACK = 'attack',
+  SKILL = 'skill',
+  POWER = 'power',
+  CURSE = 'curse'
+}
+
 export interface Card {
   id: string;
   name: string;
@@ -8,6 +16,7 @@ export interface Card {
   effect?: string;
   class: PlayerClass | OpponentType;
   rarity: 'common' | 'rare' | 'epic';
+  types?: CardType[];
 }
 
 export interface Passive {

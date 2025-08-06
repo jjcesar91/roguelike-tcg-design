@@ -1,4 +1,4 @@
-import { Card, Passive, Opponent, PlayerClass, OpponentType } from '@/types/game';
+import { Card, Passive, Opponent, PlayerClass, OpponentType, CardType } from '@/types/game';
 
 // Player Class Cards
 export const playerCards: Record<PlayerClass, Card[]> = {
@@ -10,7 +10,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 1,
       attack: 6,
       class: 'warrior',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'warrior_defend',
@@ -19,7 +20,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 1,
       defense: 5,
       class: 'warrior',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.SKILL]
     },
     {
       id: 'warrior_bash',
@@ -29,7 +31,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 8,
       effect: 'Apply 2 vulnerable',
       class: 'warrior',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'warrior_riposte',
@@ -39,26 +42,29 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 8,
       effect: 'Damage + current block',
       class: 'warrior',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'warrior_shield_up',
-      name: 'Shield Up',
+      name: 'shield Up',
       description: 'Gain 8 block. Next turn, you don\'t lose block at the end of enemy turn',
       cost: 1,
       defense: 8,
       effect: 'Persistent block',
       class: 'warrior',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.SKILL]
     },
     {
       id: 'warrior_press_the_attack',
-      name: 'Press the Attack',
+      name: 'press the Attack',
       description: 'Deal 12 damage',
       cost: 3,
       attack: 12,
       class: 'warrior',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.MELEE, CardType.ATTACK]
     }
   ],
   rogue: [
@@ -82,7 +88,7 @@ export const playerCards: Record<PlayerClass, Card[]> = {
     },
     {
       id: 'rogue_backstab',
-      name: 'Backstab',
+      name: 'backstab',
       description: 'Deal 10 damage. Costs 0 if this is the first card played.',
       cost: 1,
       attack: 10,
@@ -101,7 +107,7 @@ export const playerCards: Record<PlayerClass, Card[]> = {
     },
     {
       id: 'rogue_dagger_throw',
-      name: 'Dagger Throw',
+      name: 'dagger Throw',
       description: 'Deal 4 damage. Draw 1 card.',
       cost: 0,
       attack: 4,
@@ -111,7 +117,7 @@ export const playerCards: Record<PlayerClass, Card[]> = {
     },
     {
       id: 'rogue_stealth',
-      name: 'Stealth',
+      name: 'stealth',
       description: 'Gain 15 block. Become invisible until next turn.',
       cost: 2,
       defense: 15,
@@ -151,7 +157,7 @@ export const playerCards: Record<PlayerClass, Card[]> = {
     },
     {
       id: 'wizard_fireball',
-      name: 'Fireball',
+      name: 'fireball',
       description: 'Deal 14 damage',
       cost: 2,
       attack: 14,
@@ -160,7 +166,7 @@ export const playerCards: Record<PlayerClass, Card[]> = {
     },
     {
       id: 'wizard_frost_shield',
-      name: 'Frost Shield',
+      name: 'frost Shield',
       description: 'Gain 10 block. Freeze enemy for 1 turn.',
       cost: 2,
       defense: 10,
@@ -170,7 +176,7 @@ export const playerCards: Record<PlayerClass, Card[]> = {
     },
     {
       id: 'wizard_arcane_power',
-      name: 'Arcane Power',
+      name: 'arcane Power',
       description: 'Gain 2 energy. Your next spell costs 0.',
       cost: 1,
       effect: 'Energy bonus + next spell free',
@@ -185,7 +191,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
   beast: [
     {
       id: 'beast_claw',
-      name: 'Sharp Claws',
+      name: 'sharp Claws',
       description: 'Deal 7 damage',
       cost: 1,
       attack: 7,
@@ -194,7 +200,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'beast_bite',
-      name: 'Vicious Bite',
+      name: 'vicious Bite',
       description: 'Deal 10 damage. Take 2 damage.',
       cost: 2,
       attack: 10,
@@ -204,7 +210,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'beast_howl',
-      name: 'Terrifying Howl',
+      name: 'terrifying Howl',
       description: 'Apply 2 weak to player',
       cost: 1,
       effect: 'Apply 2 weak',
@@ -224,7 +230,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'monster_roar',
-      name: 'Monster Roar',
+      name: 'monster Roar',
       description: 'Gain 6 block. Deal 4 damage',
       cost: 2,
       attack: 4,
@@ -234,7 +240,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'monster_rage',
-      name: 'Enrage',
+      name: 'enrage',
       description: 'Deal 12 damage. Lose 3 health',
       cost: 1,
       attack: 12,
@@ -246,7 +252,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
   undead: [
     {
       id: 'undead_touch',
-      name: 'Life Drain',
+      name: 'life Drain',
       description: 'Deal 5 damage. Heal 3 health',
       cost: 1,
       attack: 5,
@@ -256,7 +262,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'undead_curse',
-      name: 'Death Curse',
+      name: 'death Curse',
       description: 'Apply 3 poison',
       cost: 2,
       effect: 'Apply 3 poison',
@@ -265,7 +271,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'undead_summon',
-      name: 'Raise Dead',
+      name: 'raise Dead',
       description: 'Summon 2 skeletons (6 damage each)',
       cost: 3,
       attack: 12,
@@ -277,7 +283,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
   warrior: [
     {
       id: 'enemy_warrior_strike',
-      name: 'Warrior Strike',
+      name: 'warrior Strike',
       description: 'Deal 7 damage',
       cost: 1,
       attack: 7,
@@ -286,7 +292,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'enemy_warrior_shield',
-      name: 'Iron Shield',
+      name: 'iron Shield',
       description: 'Gain 8 block',
       cost: 1,
       defense: 8,
@@ -295,7 +301,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'enemy_warrior_whirlwind',
-      name: 'Whirlwind',
+      name: 'whirlwind',
       description: 'Deal 5 damage to all enemies',
       cost: 2,
       attack: 5,
@@ -307,7 +313,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
   rogue: [
     {
       id: 'enemy_rogue_dagger',
-      name: 'Quick Dagger',
+      name: 'quick Dagger',
       description: 'Deal 6 damage',
       cost: 0,
       attack: 6,
@@ -316,7 +322,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'enemy_rogue_poison',
-      name: 'Poison Blade',
+      name: 'poison Blade',
       description: 'Deal 4 damage. Apply 2 poison',
       cost: 1,
       attack: 4,
@@ -326,7 +332,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'enemy_rogue_shadow',
-      name: 'Shadow Strike',
+      name: 'shadow Strike',
       description: 'Deal 12 damage',
       cost: 2,
       attack: 12,
@@ -337,7 +343,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
   wizard: [
     {
       id: 'enemy_wizard_missile',
-      name: 'Magic Missile',
+      name: 'magic Missile',
       description: 'Deal 5 damage',
       cost: 1,
       attack: 5,
@@ -346,7 +352,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'enemy_wizard_shield',
-      name: 'Magic Barrier',
+      name: 'magic Barrier',
       description: 'Gain 7 block',
       cost: 1,
       defense: 7,
@@ -355,7 +361,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     },
     {
       id: 'enemy_wizard_bolt',
-      name: 'Lightning Bolt',
+      name: 'lightning Bolt',
       description: 'Deal 11 damage',
       cost: 2,
       attack: 11,
@@ -370,21 +376,21 @@ export const passives: Record<PlayerClass, Passive[]> = {
   warrior: [
     {
       id: 'warrior_berserker',
-      name: 'Berserker Rage',
+      name: 'berserker Rage',
       description: 'Deal 2 extra damage when below 50% health',
       class: 'warrior',
       effect: 'damage_bonus_low_health'
     },
     {
       id: 'warrior_iron_skin',
-      name: 'Iron Skin',
+      name: 'iron Skin',
       description: 'Gain 3 extra block from all block cards',
       class: 'warrior',
       effect: 'extra_block'
     },
     {
       id: 'warrior_weapon_master',
-      name: 'Weapon Master',
+      name: 'weapon Master',
       description: 'Attack cards cost 1 less energy',
       class: 'warrior',
       effect: 'attack_cost_reduction'
@@ -393,21 +399,21 @@ export const passives: Record<PlayerClass, Passive[]> = {
   rogue: [
     {
       id: 'rogue_poison_master',
-      name: 'Poison Master',
+      name: 'poison Master',
       description: 'Poison effects last 1 extra turn',
       class: 'rogue',
       effect: 'poison_duration_bonus'
     },
     {
       id: 'rogue_shadow_dancer',
-      name: 'Shadow Dancer',
+      name: 'shadow Dancer',
       description: 'Start each turn with 1 extra energy',
       class: 'rogue',
       effect: 'extra_energy'
     },
     {
       id: 'rogue_deadly_precision',
-      name: 'Deadly Precision',
+      name: 'deadly Precision',
       description: 'First card each turn costs 0',
       class: 'rogue',
       effect: 'first_card_free'
@@ -416,21 +422,21 @@ export const passives: Record<PlayerClass, Passive[]> = {
   wizard: [
     {
       id: 'wizard_arcane_mastery',
-      name: 'Arcane Mastery',
+      name: 'arcane Mastery',
       description: 'Spell cards deal 3 extra damage',
       class: 'wizard',
       effect: 'spell_damage_bonus'
     },
     {
       id: 'wizard_mana_efficiency',
-      name: 'Mana Efficiency',
+      name: 'mana Efficiency',
       description: 'Start each turn with 4 energy instead of 3',
       class: 'wizard',
       effect: 'max_energy_bonus'
     },
     {
       id: 'wizard_elemental_focus',
-      name: 'Elemental Focus',
+      name: 'elemental Focus',
       description: 'Every 3rd spell costs 0',
       class: 'wizard',
       effect: 'every_third_spell_free'
@@ -442,7 +448,7 @@ export const passives: Record<PlayerClass, Passive[]> = {
 export const opponents: Opponent[] = [
   {
     id: 'goblin',
-    name: 'Goblin Warrior',
+    name: 'goblin Warrior',
     type: 'monster',
     health: 30,
     maxHealth: 30,
@@ -450,13 +456,14 @@ export const opponents: Opponent[] = [
       cards: [
         ...opponentCards.monster.slice(0, 2),
         ...opponentCards.monster.slice(2, 3)
-      ]
+      ],
+      discardPile: []
     },
     difficulty: 'basic'
   },
   {
     id: 'wolf',
-    name: 'Alpha Wolf',
+    name: 'alpha Wolf',
     type: 'beast',
     health: 35,
     maxHealth: 35,
@@ -464,13 +471,14 @@ export const opponents: Opponent[] = [
       cards: [
         ...opponentCards.beast.slice(0, 2),
         ...opponentCards.beast.slice(2, 3)
-      ]
+      ],
+      discardPile: []
     },
     difficulty: 'basic'
   },
   {
     id: 'skeleton',
-    name: 'Skeleton Lord',
+    name: 'skeleton Lord',
     type: 'undead',
     health: 40,
     maxHealth: 40,
@@ -478,13 +486,14 @@ export const opponents: Opponent[] = [
       cards: [
         ...opponentCards.undead.slice(0, 2),
         ...opponentCards.undead.slice(2, 3)
-      ]
+      ],
+      discardPile: []
     },
     difficulty: 'medium'
   },
   {
     id: 'bandit',
-    name: 'Bandit Leader',
+    name: 'bandit Leader',
     type: 'rogue',
     health: 45,
     maxHealth: 45,
@@ -492,13 +501,14 @@ export const opponents: Opponent[] = [
       cards: [
         ...opponentCards.rogue.slice(0, 2),
         ...opponentCards.rogue.slice(2, 3)
-      ]
+      ],
+      discardPile: []
     },
     difficulty: 'medium'
   },
   {
     id: 'dragon',
-    name: 'Ancient Dragon',
+    name: 'ancient Dragon',
     type: 'monster',
     health: 60,
     maxHealth: 60,
@@ -506,13 +516,14 @@ export const opponents: Opponent[] = [
       cards: [
         ...opponentCards.monster.slice(0, 2),
         ...opponentCards.monster.slice(2, 3)
-      ]
+      ],
+      discardPile: []
     },
     difficulty: 'boss'
   },
   {
     id: 'lich',
-    name: 'Lich King',
+    name: 'lich King',
     type: 'undead',
     health: 65,
     maxHealth: 65,
@@ -520,7 +531,8 @@ export const opponents: Opponent[] = [
       cards: [
         ...opponentCards.undead.slice(0, 2),
         ...opponentCards.undead.slice(2, 3)
-      ]
+      ],
+      discardPile: []
     },
     difficulty: 'boss'
   }

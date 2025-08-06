@@ -1,4 +1,4 @@
-import { Card, Player, Opponent, BattleState, PlayerClass, GameState } from '@/types/game';
+import { Card, Player, Opponent, BattleState, PlayerClass, GameState, Deck } from '@/types/game';
 import * as gameData from '@/data/gameData';
 
 console.log('gameUtils.ts loaded');
@@ -399,7 +399,7 @@ export function opponentPlayCard(
   
   if (playableCards.length === 0) {
     console.log('No playable cards, opponent skips turn');
-    return { newPlayer: player, newOpponent: opponent, newBattleState, log: ['Opponent skips turn'] };
+    return { newPlayer: player, newOpponent: opponent, newBattleState: battleState, log: ['Opponent skips turn'] };
   }
 
   const card = playableCards[Math.floor(Math.random() * playableCards.length)];
