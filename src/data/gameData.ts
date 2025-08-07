@@ -1,5 +1,5 @@
 import { Card, Passive, Opponent, PlayerClass, OpponentType, CardType } from '@/types/game';
-import { Swords, Skull, Zap } from 'lucide-react';
+import { Swords, Skull, Zap, VenetianMask } from 'lucide-react';
 
 // Player Classes Configuration
 export const playerClasses: Record<PlayerClass, {
@@ -28,7 +28,7 @@ export const playerClasses: Record<PlayerClass, {
     id: 'rogue',
     name: 'Rogue',
     portrait: "https://i.imgur.com/ft260IB.png",
-    icon: Skull,
+    icon: VenetianMask,
     description: 'Swift and deadly assassin',
     startingCards: ['Strike', 'Defend', 'Backstab'],
     health: 70,

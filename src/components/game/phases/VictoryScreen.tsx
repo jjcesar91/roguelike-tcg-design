@@ -11,7 +11,7 @@ export const VictoryScreen: React.FC<VictoryScreenProps> = ({ onRestart }) => {
       <div className="text-6xl">🎉</div>
       <h1 className="text-4xl font-bold game-title">Victory!</h1>
       <p className="text-xl">Congratulations! You have conquered all challenges!</p>
-      <Button onClick={onRestart} size="lg">
+      <Button onClick={onRestart} size="lg" className="custom-hover">
         Play Again
       </Button>
     </div>

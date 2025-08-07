@@ -42,7 +42,7 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
           {availableCards.map((card, index) => (
             <CardComponent 
               key={index} 
-              className={`cursor-pointer hover:shadow-md transition-all ${
+              className={`cursor-pointer hover:shadow-md transition-all custom-hover ${
                 selectedCard === card.id ? 'ring-2 ring-primary scale-105' : ''
               }`}
               onClick={() => onCardSelect(card.id)}
@@ -85,7 +85,7 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
             {uniqueCards.map((card, index) => (
               <CardComponent 
                 key={index} 
-                className={`cursor-pointer hover:shadow-md transition-all ${
+                className={`cursor-pointer hover:shadow-md transition-all custom-hover ${
                   selectedReplaceCard === card.id ? 'ring-2 ring-destructive scale-105' : ''
                 }`}
                 onClick={() => onReplaceCardSelect(card.id)}
@@ -119,6 +119,7 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
           <Button 
             onClick={onConfirm}
             size="lg"
+            className="custom-hover"
           >
             Confirm Selection
           </Button>

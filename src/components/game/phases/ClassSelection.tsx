@@ -16,7 +16,7 @@ export const ClassSelection: React.FC<ClassSelectionProps> = ({
 }) => {
   return (
     <div className="flex flex-col items-center gap-8">
-      <h1 className="text-4xl font-bold text-center game-title">Choose Your Class</h1>
+      <h1 className="text-4xl font-bold text-center game-title gothic-text">Choose Your Class</h1>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {availableClasses.map((playerClass) => {
           const classData = playerClasses[playerClass];
@@ -32,7 +32,7 @@ export const ClassSelection: React.FC<ClassSelectionProps> = ({
                 }
               }}
               disabled={!classData.available}
-              className={`p-4 border-2 rounded-lg transition-colors ${
+              className={`p-4 border-2 rounded-lg transition-colors custom-hover ${
                 classData.available 
                   ? 'border-amber-700 hover:border-amber-800 hover:bg-amber-100 cursor-pointer' 
                   : 'border-amber-400 bg-background opacity-60 cursor-not-allowed'

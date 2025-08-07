@@ -24,13 +24,13 @@ export const TurnIndicator: React.FC<TurnIndicatorProps> = ({
   return (
     <div className="w-full bg-muted border border-border rounded-lg p-4">
       <div className="flex justify-between items-center w-full">
-        <div className="text-sm font-medium">
+        <div className="text-base font-medium gothic-text">
           {battleState.turn === 'player' ? 'Your turn - Play cards!' : `${opponentName}'s turn`}
         </div>
         <div className="flex gap-2">
           <Dialog open={showDeckModal} onOpenChange={onDeckModalChange}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex items-center gap-2 custom-hover-light">
                 <Layers className="w-4 h-4" />
                 Deck ({battleState.playerDeck.cards.length})
               </Button>
@@ -40,10 +40,10 @@ export const TurnIndicator: React.FC<TurnIndicatorProps> = ({
                 <DialogTitle>Your Deck</DialogTitle>
               </DialogHeader>
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">{battleState.playerDeck.cards.length} cards remaining</p>
+                <p className="text-base text-muted-foreground">{battleState.playerDeck.cards.length} cards remaining</p>
                 <div className="max-h-64 overflow-y-auto space-y-1">
                   {battleState.playerDeck.cards.map((card, index) => (
-                    <div key={index} className="text-sm p-2 bg-muted rounded">
+                    <div key={index} className="text-base p-2 bg-muted rounded gothic-text">
                       {card.name} ({card.cost}) - {card.effect}
                     </div>
                   ))}
@@ -54,7 +54,7 @@ export const TurnIndicator: React.FC<TurnIndicatorProps> = ({
           
           <Dialog open={showDiscardModal} onOpenChange={onDiscardModalChange}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex items-center gap-2 custom-hover-light">
                 <Archive className="w-4 h-4" />
                 Discard ({battleState.playerDiscardPile.length})
               </Button>
@@ -67,7 +67,7 @@ export const TurnIndicator: React.FC<TurnIndicatorProps> = ({
                 <p className="text-sm text-muted-foreground">{battleState.playerDiscardPile.length} cards discarded</p>
                 <div className="max-h-64 overflow-y-auto space-y-1">
                   {battleState.playerDiscardPile.map((card, index) => (
-                    <div key={index} className="text-sm p-2 bg-muted rounded">
+                    <div key={index} className="text-base p-2 bg-muted rounded gothic-text">
                       {card.name} ({card.cost}) - {card.effect}
                     </div>
                   ))}

@@ -4,9 +4,10 @@ import { CardType } from '@/types/game';
 
 interface CardTypesProps {
   types: CardType[] | undefined;
+  className?: string;
 }
 
-export const CardTypes: React.FC<CardTypesProps> = ({ types }) => {
+export const CardTypes: React.FC<CardTypesProps> = ({ types, className }) => {
   if (!types || types.length === 0) return null;
   
   const getTypeColor = (type: CardType) => {
@@ -46,7 +47,7 @@ export const CardTypes: React.FC<CardTypesProps> = ({ types }) => {
   };
   
   return (
-    <div className="flex flex-wrap gap-1 mt-2" title={types.join(', ')}>
+    <div className={`flex flex-wrap gap-1 mt-2 ${className || ''}`} title={types.join(', ')}>
       {types.map((type, index) => (
         <div 
           key={index}

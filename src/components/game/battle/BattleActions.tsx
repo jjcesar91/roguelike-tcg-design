@@ -17,6 +17,7 @@ export const BattleActions: React.FC<BattleActionsProps> = ({
         onClick={onEndTurn} 
         disabled={battleState.turn !== 'player'}
         variant={battleState.turn === 'player' ? 'default' : 'secondary'}
+        className="custom-hover"
       >
         {battleState.turn === 'player' ? 'End Turn' : 'Opponent Turn...'}
       </Button>

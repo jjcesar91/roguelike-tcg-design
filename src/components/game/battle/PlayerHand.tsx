@@ -19,25 +19,25 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 }) => {
   return (
     <div>
-      <h3 className="text-lg font-semibold card-title mb-4">Your Hand ({battleState.playerHand.length}/5)</h3>
+      <h3 className="text-xl font-semibold card-title mb-4">Your Hand ({battleState.playerHand.length}/5)</h3>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {battleState.playerHand.map((card, index) => (
           <CardComponent 
             key={index} 
-            className={`cursor-pointer hover:shadow-md transition-all ${
+            className={`cursor-pointer hover:shadow-md transition-all custom-hover ${
               !canPlayCard(card) ? 'opacity-50' : ''
             } ${battleState.turn === 'player' ? 'hover:scale-105' : ''}`}
             onClick={() => battleState.turn === 'player' && canPlayCard(card) && onCardPlay(card)}
           >
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-1">
               <div className="flex justify-between items-start">
-                <CardTitle className="text-sm">{card.name}</CardTitle>
+                <CardTitle className="text-base">{card.name}</CardTitle>
                 <EnergyCost cost={card.cost} card={card} player={player} />
               </div>
             </CardHeader>
-            <CardContent>
-              <CardTypes types={card.types} />
-              <CardDescription className="text-xs">{card.description}</CardDescription>
+            <CardContent className="pt-0">
+              <CardTypes types={card.types} className="mb-2" />
+              <CardDescription className="text-sm gothic-text">{card.description}</CardDescription>
             </CardContent>
           </CardComponent>
         ))}

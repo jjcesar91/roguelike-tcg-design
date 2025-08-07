@@ -67,8 +67,11 @@ export default function Game() {
       
       setSelectedClass(playerClass);
       
-      // Show splash screen
-      showBattleSplash(opponent);
+      // Show splash screen with scroll callback
+      showBattleSplash(opponent, () => {
+        // Scroll to top after splash screen completes
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
       
       // Force a re-render by logging immediately after
       setTimeout(() => {
@@ -172,8 +175,11 @@ export default function Game() {
     setSelectedCard(null);
     setSelectedReplaceCard(null);
     
-    // Show splash screen
-    showBattleSplash(opponent);
+    // Show splash screen with scroll callback
+    showBattleSplash(opponent, () => {
+      // Scroll to top after splash screen completes
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   };
 
   const handlePassiveSelect = (passive: any) => {

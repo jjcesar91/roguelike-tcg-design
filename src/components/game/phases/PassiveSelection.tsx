@@ -32,7 +32,7 @@ export const PassiveSelection: React.FC<PassiveSelectionProps> = ({
         {availablePassives.map((passive, index) => (
           <CardComponent 
             key={index} 
-            className={`cursor-pointer hover:shadow-md transition-all ${
+            className={`cursor-pointer hover:shadow-md transition-all custom-hover ${
               selectedPassive === passive.id ? 'ring-2 ring-primary scale-105' : ''
             }`}
             onClick={() => onPassiveSelect(passive.id)}
@@ -61,6 +61,7 @@ export const PassiveSelection: React.FC<PassiveSelectionProps> = ({
           <Button 
             onClick={onConfirm}
             size="lg"
+            className="custom-hover"
           >
             Confirm Selection
           </Button>

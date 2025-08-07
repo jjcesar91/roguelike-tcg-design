@@ -5,7 +5,7 @@ export const useSplashScreen = () => {
   const [showSplashScreen, setShowSplashScreen] = useState(false);
   const [splashOpponent, setSplashOpponent] = useState<Opponent | null>(null);
 
-  const showBattleSplash = (opponent: Opponent) => {
+  const showBattleSplash = (opponent: Opponent, onSplashComplete?: () => void) => {
     setSplashOpponent(opponent);
     setShowSplashScreen(true);
     
@@ -13,6 +13,9 @@ export const useSplashScreen = () => {
     setTimeout(() => {
       setShowSplashScreen(false);
       setSplashOpponent(null);
+      if (onSplashComplete) {
+        onSplashComplete();
+      }
     }, 2000);
   };
 

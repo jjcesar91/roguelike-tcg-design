@@ -39,20 +39,20 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
             />
           </div>
         </div>
-        <div className="font-semibold card-title capitalize flex items-center gap-2 mb-2">
+        <div className="font-semibold card-title text-lg flex items-center gap-2 mb-2">
           <PlayerIcon className="w-5 h-5" />
           {playerClassData.name}
-          <Badge variant="outline" className="text-xs">Level {player.level}</Badge>
+          <Badge variant="outline" className="text-sm">Level {player.level}</Badge>
         </div>
         <div className="flex items-center gap-2 mb-1">
           <Heart className="w-4 h-4 text-red-500" />
-          <span className="text-sm">{player.health}/{player.maxHealth}</span>
+          <span className="text-base gothic-text">{player.health}/{player.maxHealth}</span>
         </div>
         <Progress value={(player.health / player.maxHealth) * 100} className="w-28 h-2 mb-2" />
         {battleState.playerBlock > 0 && (
           <div className="flex items-center gap-2 mb-2">
             <Shield className="w-4 h-4 text-blue-500" />
-            <span className="text-sm text-blue-600">{battleState.playerBlock} Block</span>
+            <span className="text-base text-blue-600 gothic-text">{battleState.playerBlock} Block</span>
           </div>
         )}
         <StatusEffects 
@@ -69,7 +69,7 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
       
       {/* VS - Center */}
       <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
-        <div className="text-3xl font-bold fantasy-text text-amber-700 bg-amber-100 px-4 py-2 rounded-full border-2 border-amber-300">
+        <div className="text-3xl font-bold fantasy-text text-amber-700">
           Vs
         </div>
       </div>
@@ -91,15 +91,18 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
             />
           </div>
         </div>
-        <div className="font-semibold card-title mb-2">{opponent.name}</div>
+        <div className="font-semibold card-title text-lg flex items-center justify-end gap-2 mb-2">
+          {opponent.name}
+          <Skull className="w-5 h-5" />
+        </div>
         <div className="flex items-center justify-end gap-2 mb-1">
-          <span className="text-sm">{opponent.health}/{opponent.maxHealth}</span>
+          <span className="text-base gothic-text">{opponent.health}/{opponent.maxHealth}</span>
           <Heart className="w-4 h-4 text-red-500" />
         </div>
         <Progress value={(opponent.health / opponent.maxHealth) * 100} className="w-28 h-2 mb-2 ml-auto" />
         {battleState.opponentBlock > 0 && (
           <div className="flex items-center justify-end gap-2 mb-2">
-            <span className="text-sm text-blue-600">{battleState.opponentBlock} Block</span>
+            <span className="text-base text-blue-600 gothic-text">{battleState.opponentBlock} Block</span>
             <Shield className="w-4 h-4 text-blue-500" />
           </div>
         )}

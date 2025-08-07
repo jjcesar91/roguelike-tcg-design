@@ -34,14 +34,14 @@ export const StartingSplashScreen: React.FC<StartingSplashScreenProps> = ({
 
   return (
     <div className={`fixed inset-0 bg-black flex items-center justify-center z-50 transition-opacity duration-500 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
-      <div className="w-full h-full flex items-center justify-center p-8">
+      <div className="w-full h-full flex items-center justify-center p-4 md:p-8 lg:p-12">
         <img 
           src="https://i.imgur.com/qESwpq9.png" 
           alt="Game Splash Art" 
-          className="max-w-full max-h-full object-contain"
+          className="max-w-full max-h-full object-contain transform scale-90 md:scale-100 lg:scale-110"
           style={{
-            maxWidth: '90vw',
-            maxHeight: '90vh'
+            maxWidth: '95vw',
+            maxHeight: '95vh'
           }}
         />
       </div>
