@@ -75,7 +75,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 1,
       attack: 6,
       class: 'rogue',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'rogue_defend',
@@ -84,7 +85,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 1,
       defense: 5,
       class: 'rogue',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.SKILL]
     },
     {
       id: 'rogue_backstab',
@@ -94,7 +96,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 10,
       effect: 'Free on first play',
       class: 'rogue',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'rogue_poison',
@@ -103,7 +106,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 1,
       effect: 'Apply 3 poison',
       class: 'rogue',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.SKILL]
     },
     {
       id: 'rogue_dagger_throw',
@@ -113,7 +117,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 4,
       effect: 'Draw 1 card',
       class: 'rogue',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'rogue_stealth',
@@ -123,7 +128,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       defense: 15,
       effect: 'Invisibility',
       class: 'rogue',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.SKILL]
     }
   ],
   wizard: [
@@ -134,7 +140,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 1,
       attack: 6,
       class: 'wizard',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'wizard_defend',
@@ -143,7 +150,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 1,
       defense: 5,
       class: 'wizard',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.SKILL]
     },
     {
       id: 'wizard_zap',
@@ -153,7 +161,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 8,
       effect: 'Lightning damage',
       class: 'wizard',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.ATTACK]
     },
     {
       id: 'wizard_fireball',
@@ -162,7 +171,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 2,
       attack: 14,
       class: 'wizard',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.ATTACK]
     },
     {
       id: 'wizard_frost_shield',
@@ -172,7 +182,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       defense: 10,
       effect: 'Freeze enemy',
       class: 'wizard',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.SKILL]
     },
     {
       id: 'wizard_arcane_power',
@@ -181,7 +192,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 1,
       effect: 'Energy bonus + next spell free',
       class: 'wizard',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.POWER]
     }
   ]
 };
