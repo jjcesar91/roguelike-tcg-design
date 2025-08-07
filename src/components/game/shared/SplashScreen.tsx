@@ -14,15 +14,6 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
 }) => {
   if (!showSplashScreen || !splashOpponent) return null;
 
-  const opponentPortraits = {
-    'goblin Warrior': "https://i.imgur.com/oC9kaes.png",
-    'alpha Wolf': "https://i.imgur.com/By58IEi.png",
-    'skeleton Lord': "https://i.imgur.com/k14VZr1.png",
-    'bandit Leader': "https://i.imgur.com/VmoKR49.png",
-    'ancient Dragon': "https://i.imgur.com/701zzec.png",
-    'lich King': "https://i.imgur.com/tGEbCEd.png"
-  };
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 transition-opacity duration-500">
       <div className="text-center space-y-6">
@@ -30,7 +21,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         <div className="flex justify-center">
           <div className="w-48 h-48 rounded-lg overflow-hidden bg-amber-50 flex items-center justify-center border-4 border-amber-700">
             <img 
-              src={opponentPortraits[splashOpponent.name as keyof typeof opponentPortraits]} 
+              src={splashOpponent.portrait} 
               alt={`${splashOpponent.name} Portrait`} 
               className="w-full h-full object-cover"
               onError={(e) => {

@@ -15,6 +15,7 @@ import { BattlePhase } from './game/battle/BattlePhase';
 import { SplashScreen } from './game/shared/SplashScreen';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PlayerClass } from '@/types/game/GameState';
+import { playerClasses } from '@/data/gameData';
 
 export default function Game() {
   const {
@@ -210,7 +211,7 @@ export default function Game() {
         {gameState.gamePhase === 'class-selection' && (
           <ClassSelection 
             onClassSelect={handleClassSelect}
-            availableClasses={['warrior', 'rogue', 'wizard']}
+            availableClasses={Object.keys(playerClasses) as PlayerClass[]}
           />
         )}
         

@@ -1,4 +1,52 @@
 import { Card, Passive, Opponent, PlayerClass, OpponentType, CardType } from '@/types/game';
+import { Swords, Skull, Zap } from 'lucide-react';
+
+// Player Classes Configuration
+export const playerClasses: Record<PlayerClass, {
+  id: PlayerClass;
+  name: string;
+  portrait: string;
+  icon: React.ComponentType<any>;
+  description: string;
+  startingCards: string[];
+  health: number;
+  energy: number;
+  available: boolean;
+}> = {
+  warrior: {
+    id: 'warrior',
+    name: 'Warrior',
+    portrait: "https://i.imgur.com/UDCcD6u.png",
+    icon: Swords,
+    description: 'Master of combat and defense',
+    startingCards: ['Strike', 'Defend', 'Bash'],
+    health: 75,
+    energy: 3,
+    available: true
+  },
+  rogue: {
+    id: 'rogue',
+    name: 'Rogue',
+    portrait: "https://i.imgur.com/dR6vXfK.png",
+    icon: Skull,
+    description: 'Swift and deadly assassin',
+    startingCards: ['Strike', 'Defend', 'Backstab'],
+    health: 70,
+    energy: 3,
+    available: false
+  },
+  wizard: {
+    id: 'wizard',
+    name: 'Wizard',
+    portrait: "https://i.imgur.com/ti7tvRs.png",
+    icon: Zap,
+    description: 'Wielder of arcane powers',
+    startingCards: ['Strike', 'Defend', 'Zap'],
+    health: 65,
+    energy: 3,
+    available: false
+  }
+};
 
 // Player Class Cards
 export const playerCards: Record<PlayerClass, Card[]> = {
@@ -464,6 +512,7 @@ export const opponents: Opponent[] = [
     type: 'monster',
     health: 30,
     maxHealth: 30,
+    portrait: "https://i.imgur.com/oC9kaes.png",
     deck: {
       cards: [
         ...opponentCards.monster.slice(0, 2),
@@ -479,6 +528,7 @@ export const opponents: Opponent[] = [
     type: 'beast',
     health: 35,
     maxHealth: 35,
+    portrait: "https://i.imgur.com/By58IEi.png",
     deck: {
       cards: [
         ...opponentCards.beast.slice(0, 2),
@@ -494,6 +544,7 @@ export const opponents: Opponent[] = [
     type: 'undead',
     health: 40,
     maxHealth: 40,
+    portrait: "https://i.imgur.com/k14VZr1.png",
     deck: {
       cards: [
         ...opponentCards.undead.slice(0, 2),
@@ -509,6 +560,7 @@ export const opponents: Opponent[] = [
     type: 'rogue',
     health: 45,
     maxHealth: 45,
+    portrait: "https://i.imgur.com/VmoKR49.png",
     deck: {
       cards: [
         ...opponentCards.rogue.slice(0, 2),
@@ -524,6 +576,7 @@ export const opponents: Opponent[] = [
     type: 'monster',
     health: 60,
     maxHealth: 60,
+    portrait: "https://i.imgur.com/701zzec.png",
     deck: {
       cards: [
         ...opponentCards.monster.slice(0, 2),
@@ -539,6 +592,7 @@ export const opponents: Opponent[] = [
     type: 'undead',
     health: 65,
     maxHealth: 65,
+    portrait: "https://i.imgur.com/tGEbCEd.png",
     deck: {
       cards: [
         ...opponentCards.undead.slice(0, 2),

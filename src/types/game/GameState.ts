@@ -25,11 +25,15 @@ export interface Player {
 }
 
 export interface Opponent {
+  id: string;
   name: string;
+  type: string;
   health: number;
   maxHealth: number;
+  portrait: string;
   difficulty: 'basic' | 'medium' | 'boss';
   intent: Intent[];
+  deck: Deck;
 }
 
 export interface BattleState {

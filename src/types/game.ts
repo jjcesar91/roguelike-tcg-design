@@ -90,6 +90,18 @@ export interface BattleState {
 export type PlayerClass = 'warrior' | 'rogue' | 'wizard';
 export type OpponentType = 'beast' | 'monster' | 'undead' | 'warrior' | 'rogue' | 'wizard';
 
+export interface PlayerClassData {
+  id: PlayerClass;
+  name: string;
+  portrait: string;
+  icon: React.ComponentType<any>;
+  description: string;
+  startingCards: string[];
+  health: number;
+  energy: number;
+  available: boolean;
+}
+
 export interface CardChoice {
   card: Card;
   replaceCardId: string;
