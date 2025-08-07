@@ -49,14 +49,24 @@ export interface Opponent {
   type: OpponentType;
   health: number;
   maxHealth: number;
+  portrait: string;
   deck: Deck;
   difficulty: 'basic' | 'medium' | 'boss';
 }
 
+export type GamePhase = 
+  | 'starting-splash'
+  | 'class-selection'
+  | 'battle'
+  | 'card-selection'
+  | 'passive-selection'
+  | 'victory'
+  | 'defeat';
+
 export interface GameState {
   player: Player | null;
   currentOpponent: Opponent | null;
-  gamePhase: 'class-selection' | 'battle' | 'card-selection' | 'passive-selection' | 'victory' | 'defeat';
+  gamePhase: GamePhase;
   availableCards: Card[];
   availablePassives: Passive[];
   battleState: BattleState | null;
@@ -100,6 +110,12 @@ export interface PlayerClassData {
   health: number;
   energy: number;
   available: boolean;
+}
+
+export interface Intent {
+  type: 'attack' | 'block' | 'buff' | 'debuff';
+  value: number;
+  description: string;
 }
 
 export interface CardChoice {

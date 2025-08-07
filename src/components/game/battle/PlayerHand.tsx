@@ -1,5 +1,5 @@
 import React from 'react';
-import { Player, BattleState, Card } from '@/types/game/GameState';
+import { Player, BattleState, Card } from '@/types/game';
 import { Card as CardComponent, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EnergyCost } from '@/components/game/shared/EnergyCost';
 import { CardTypes } from '@/components/game/shared/CardTypes';

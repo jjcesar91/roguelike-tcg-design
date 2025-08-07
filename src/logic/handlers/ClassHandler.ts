@@ -1,4 +1,4 @@
-import { PlayerClass, Player, Opponent } from '@/types/game/GameState';
+import { PlayerClass, Player, Opponent } from '@/types/game';
 import { createPlayer, getRandomOpponent, initializeBattle, drawCardsWithReshuffle } from '@/lib/gameUtils';
 
 export class ClassHandler {

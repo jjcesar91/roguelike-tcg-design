@@ -1,4 +1,4 @@
-import { Card, Player, Opponent, BattleState } from '@/types/game/GameState';
+import { Card, Player, Opponent, BattleState } from '@/types/game';
 import { playCard, opponentPlayCard, endTurn, checkVictory, checkDefeat, canPlayCard as canPlayCardUtil } from '@/lib/gameUtils';
 
 export class BattleHandler {

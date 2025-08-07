@@ -1,4 +1,4 @@
-import { Card, Player } from '@/types/game/GameState';
+import { Card, Player } from '@/types/game';
 import { replaceCardInDeck, getRandomOpponent, initializeBattle, drawCardsWithReshuffle, getRandomCards } from '@/lib/gameUtils';
 
 export class SelectionHandler {

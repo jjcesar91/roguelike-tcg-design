@@ -1,5 +1,5 @@
 import React from 'react';
-import { Opponent } from '@/types/game/GameState';
+import { Opponent } from '@/types/game';
 import { Badge } from '@/components/ui/badge';
 import { Skull } from 'lucide-react';
 

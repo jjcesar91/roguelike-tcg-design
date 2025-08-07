@@ -1,4 +1,4 @@
-import { PlayerClass, Player, Opponent, BattleState, Card } from '@/types/game/GameState';
+import { PlayerClass, Player, Opponent, BattleState, Card } from '@/types/game';
 import { ClassHandler } from '../handlers/ClassHandler';
 import { BattleHandler } from '../handlers/BattleHandler';
 import { SelectionHandler } from '../handlers/SelectionHandler';

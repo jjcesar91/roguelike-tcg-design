@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { GameState, PlayerClass, Player, Opponent, BattleState } from '@/types/game/GameState';
+import { GameState, PlayerClass, Player, Opponent, BattleState } from '@/types/game';
 import { createPlayer, getRandomOpponent, initializeBattle, getRandomCards, getRandomPassives, replaceCardInDeck, drawCardsWithReshuffle } from '@/lib/gameUtils';
 
 export const useGameState = () => {
   const [gameState, setGameState] = useState<GameState>({
     player: null,
     currentOpponent: null,
-    gamePhase: 'class-selection',
+    gamePhase: 'starting-splash',
     availableCards: [],
     availablePassives: [],
     battleState: null
@@ -95,7 +95,7 @@ export const useGameState = () => {
     setGameState({
       player: null,
       currentOpponent: null,
-      gamePhase: 'class-selection',
+      gamePhase: 'starting-splash',
       availableCards: [],
       availablePassives: [],
       battleState: null

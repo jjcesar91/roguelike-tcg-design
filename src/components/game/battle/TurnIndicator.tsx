@@ -1,5 +1,5 @@
 import React from 'react';
-import { BattleState } from '@/types/game/GameState';
+import { BattleState } from '@/types/game';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Layers, Archive } from 'lucide-react';

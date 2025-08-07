@@ -1,5 +1,5 @@
 import React from 'react';
-import { BattleState } from '@/types/game/GameState';
+import { BattleState } from '@/types/game';
 
 interface BattleLogProps {
   battleState: BattleState;

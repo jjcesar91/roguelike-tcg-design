@@ -13,8 +13,9 @@ import { VictoryScreen } from './game/phases/VictoryScreen';
 import { DefeatScreen } from './game/phases/DefeatScreen';
 import { BattlePhase } from './game/battle/BattlePhase';
 import { SplashScreen } from './game/shared/SplashScreen';
+import { StartingSplashScreen } from './game/shared/StartingSplashScreen';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { PlayerClass } from '@/types/game/GameState';
+import { PlayerClass } from '@/types/game';
 import { playerClasses } from '@/data/gameData';
 
 export default function Game() {
@@ -193,6 +194,10 @@ export default function Game() {
     resetSelections();
   };
 
+  const handleStartingSplashComplete = () => {
+    setGamePhase('class-selection');
+  };
+
   const canPlayCard = (card: any) => {
     if (!gameState.player || !gameState.battleState) return false;
     return GameEngine.canPlayCard(card, gameState.player, gameState.battleState);
@@ -201,6 +206,12 @@ export default function Game() {
   return (
     <TooltipProvider>
       <div className="container mx-auto p-4 max-w-6xl">
+        {/* Starting Splash Screen */}
+        <StartingSplashScreen 
+          isVisible={gameState.gamePhase === 'starting-splash'}
+          onComplete={handleStartingSplashComplete}
+        />
+        
         {/* Splash Screen */}
         <SplashScreen 
           showSplashScreen={showSplashScreen}

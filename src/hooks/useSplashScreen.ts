@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Opponent } from '@/types/game/GameState';
+import { Opponent } from '@/types/game';
 
 export const useSplashScreen = () => {
   const [showSplashScreen, setShowSplashScreen] = useState(false);

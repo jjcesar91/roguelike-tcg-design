@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card } from '@/types/game/GameState';
+import { Card } from '@/types/game';
 import { Button } from '@/components/ui/button';
 import { Card as CardComponent, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

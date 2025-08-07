@@ -1,5 +1,5 @@
 import React from 'react';
-import { Player, Opponent, BattleState, Card } from '@/types/game/GameState';
+import { Player, Opponent, BattleState, Card } from '@/types/game';
 import { BattleHeader } from './BattleHeader';
 import { TurnIndicator } from './TurnIndicator';
 import { BattleLog } from './BattleLog';

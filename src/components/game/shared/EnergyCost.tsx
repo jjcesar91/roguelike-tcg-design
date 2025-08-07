@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Player } from '@/types/game/GameState';
+import { Card, Player } from '@/types/game';
 import { Zap } from 'lucide-react';
 import { getCardCost } from '@/lib/gameUtils';
 

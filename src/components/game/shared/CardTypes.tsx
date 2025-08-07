@@ -1,6 +1,6 @@
 import React from 'react';
 import { Hand, Swords, Star, Crown, Skull } from 'lucide-react';
-import { CardType } from '@/types/game/GameState';
+import { CardType } from '@/types/game';
 
 interface CardTypesProps {
   types: CardType[] | undefined;
