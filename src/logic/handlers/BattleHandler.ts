@@ -20,11 +20,13 @@ export class BattleHandler {
   static handleEndTurn(battleState: BattleState, player: Player, opponent: Opponent) {
     console.log('handleEndTurn called');
     
-    let newBattleState = endTurn(battleState);
+    const { newBattleState, newPlayer, newOpponent } = endTurn(battleState, player, opponent);
     console.log('After endTurn, new turn:', newBattleState.turn);
     
     return {
       newBattleState,
+      newPlayer,
+      newOpponent,
       isOpponentTurn: newBattleState.turn === 'opponent'
     };
   }
@@ -41,19 +43,19 @@ export class BattleHandler {
 
     // After opponent plays, automatically end their turn and go back to player
     console.log('Ending opponent turn...');
-    updatedBattleState = endTurn(updatedBattleState);
-    console.log('After ending opponent turn, new turn:', updatedBattleState.turn);
+    const { newBattleState: finalBattleState, newPlayer: finalPlayer, newOpponent: finalOpponent } = endTurn(updatedBattleState, result.newPlayer, result.newOpponent);
+    console.log('After ending opponent turn, new turn:', finalBattleState.turn);
 
     return {
-      newPlayer: result.newPlayer,
-      newOpponent: result.newOpponent,
-      newBattleState: updatedBattleState,
-      isVictory: checkVictory(result.newPlayer, result.newOpponent),
-      isDefeat: checkDefeat(result.newPlayer)
+      newPlayer: finalPlayer,
+      newOpponent: finalOpponent,
+      newBattleState: finalBattleState,
+      isVictory: checkVictory(finalPlayer, finalOpponent),
+      isDefeat: checkDefeat(finalPlayer)
     };
   }
 
   static canPlayCard(card: Card, player: Player, battleState: BattleState) {
-    return canPlayCardUtil(card, player, battleState.playerEnergy);
+    return canPlayCardUtil(card, player, battleState.playerEnergy, battleState);
   }
 }

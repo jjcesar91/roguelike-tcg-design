@@ -4,7 +4,6 @@ import { BattleHeader } from './BattleHeader';
 import { TurnIndicator } from './TurnIndicator';
 import { BattleLog } from './BattleLog';
 import { PlayerHand } from './PlayerHand';
-import { BattleActions } from './BattleActions';
 
 interface BattlePhaseProps {
   player: Player;
@@ -48,6 +47,7 @@ export const BattlePhase: React.FC<BattlePhaseProps> = ({
         showDiscardModal={showDiscardModal}
         onDeckModalChange={onDeckModalChange}
         onDiscardModalChange={onDiscardModalChange}
+        onEndTurn={onEndTurn}
       />
       
       {/* Battle Log */}
@@ -59,12 +59,6 @@ export const BattlePhase: React.FC<BattlePhaseProps> = ({
         battleState={battleState}
         onCardPlay={onCardPlay}
         canPlayCard={canPlayCard}
-      />
-      
-      {/* Action Buttons */}
-      <BattleActions 
-        battleState={battleState}
-        onEndTurn={onEndTurn}
       />
     </div>
   );

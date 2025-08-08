@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/types/game';
 import { Button } from '@/components/ui/button';
 import { Card as CardComponent, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,20 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
   onReplaceCardSelect,
   onConfirm
 }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const handleAvailableCardClick = (cardId: string) => {
+    if (!isModalOpen) {
+      onCardSelect(cardId);
+    }
+  };
+  
+  const handleReplaceCardClick = (cardId: string) => {
+    if (!isModalOpen) {
+      onReplaceCardSelect(cardId);
+    }
+  };
+  
   const uniqueCards = Array.from(new Set(player.deck.cards.map(card => card.id)))
     .map(id => player.deck.cards.find(card => card.id === id)!);
 
@@ -44,14 +58,17 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
               key={index} 
               className={`cursor-pointer hover:shadow-md transition-all custom-hover ${
                 selectedCard === card.id ? 'ring-2 ring-primary scale-105' : ''
-              }`}
-              onClick={() => onCardSelect(card.id)}
+              } ${isModalOpen ? 'opacity-50' : ''}`}
+              onClick={() => handleAvailableCardClick(card.id)}
             >
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg flex items-center gap-2">
                     {card.name}
-                    <CardTypes types={card.types} />
+                    <CardTypes 
+                      types={card.types} 
+                      onModalOpenChange={setIsModalOpen}
+                    />
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <EnergyCost cost={card.cost} />
@@ -87,14 +104,17 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
                 key={index} 
                 className={`cursor-pointer hover:shadow-md transition-all custom-hover ${
                   selectedReplaceCard === card.id ? 'ring-2 ring-destructive scale-105' : ''
-                }`}
-                onClick={() => onReplaceCardSelect(card.id)}
+                } ${isModalOpen ? 'opacity-50' : ''}`}
+                onClick={() => handleReplaceCardClick(card.id)}
               >
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg flex items-center gap-2">
                       {card.name}
-                      <CardTypes types={card.types} />
+                      <CardTypes 
+                        types={card.types} 
+                        onModalOpenChange={setIsModalOpen}
+                      />
                     </CardTitle>
                     <EnergyCost cost={card.cost} />
                   </div>

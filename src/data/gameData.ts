@@ -251,182 +251,294 @@ export const opponentCards: Record<OpponentType, Card[]> = {
   beast: [
     {
       id: 'beast_claw',
-      name: 'sharp Claws',
+      name: 'Alpha Claws',
       description: 'Deal 7 damage',
       cost: 1,
       attack: 7,
       class: 'beast',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'beast_bite',
-      name: 'vicious Bite',
-      description: 'Deal 10 damage. Take 2 damage.',
-      cost: 2,
-      attack: 10,
-      effect: 'Self damage',
+      name: 'Vicious Bite',
+      description: 'Deal 5 damage. Apply bleed 2.',
+      cost: 1,
+      attack: 5,
+      effect: 'Apply bleed 2',
       class: 'beast',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'beast_howl',
-      name: 'terrifying Howl',
+      name: 'Terrifying Howl',
       description: 'Apply 2 weak to player',
-      cost: 1,
+      cost: 2,
       effect: 'Apply 2 weak',
       class: 'beast',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.SKILL]
+    },
+    {
+      id: 'beast_pack_mentality',
+      name: 'Call the Pack',
+      description: 'Shuffle 2 \'Wolf\' unplayable minion cards in the player deck with \'Deal 5 damage when drawn\'',
+      cost: 2,
+      effect: 'Shuffle wolf minions',
+      class: 'beast',
+      rarity: 'rare',
+      types: [CardType.SKILL]
+    },
+    {
+      id: 'beast_feral_rage',
+      name: 'Feral Rage',
+      description: 'Deal 12 damage. Lose 3 health',
+      cost: 1,
+      attack: 12,
+      effect: 'Self damage for power',
+      class: 'beast',
+      rarity: 'rare',
+      types: [CardType.MELEE, CardType.ATTACK]
+    },
+    {
+      id: 'beast_alpha_presence',
+      name: 'Alpha Presence',
+      description: 'Gain 8 block. All beast cards cost 1 less this turn',
+      cost: 2,
+      defense: 8,
+      effect: 'Cost reduction for beasts',
+      class: 'beast',
+      rarity: 'rare',
+      types: [CardType.SKILL]
+    },
+    {
+      id: 'beast_hunters_instinct',
+      name: 'Killing Instinct',
+      description: 'Deal 10 damage. If the target is bleeding, deals 15 instead.',
+      cost: 2,
+      attack: 10,
+      effect: 'Bonus damage vs bleeding',
+      class: 'beast',
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
+    },
+    {
+      id: 'beast_maul',
+      name: 'Brutal Maul',
+      description: 'Deal 15 damage',
+      cost: 3,
+      attack: 15,
+      class: 'beast',
+      rarity: 'rare',
+      types: [CardType.MELEE, CardType.ATTACK]
+    },
+    {
+      id: 'beast_wolf_minion',
+      name: 'Wolf',
+      description: 'Unplayable minion. Deal 5 damage to player when drawn.',
+      cost: 0,
+      attack: 5,
+      effect: 'Deal damage when drawn',
+      class: 'beast',
+      rarity: 'special',
+      types: [CardType.MINION],
+      unplayable: true
     }
   ],
   monster: [
     {
-      id: 'monster_slam',
-      name: 'Slam',
-      description: 'Deal 8 damage',
-      cost: 2,
-      attack: 8,
-      class: 'monster',
-      rarity: 'common'
-    },
-    {
-      id: 'monster_roar',
-      name: 'monster Roar',
-      description: 'Gain 6 block. Deal 4 damage',
-      cost: 2,
-      attack: 4,
-      defense: 6,
-      class: 'monster',
-      rarity: 'common'
-    },
-    {
-      id: 'monster_rage',
-      name: 'enrage',
-      description: 'Deal 12 damage. Lose 3 health',
+      id: 'goblin_dirty_trick',
+      name: 'Dirty Trick',
+      description: 'Next turn player draw one card less',
       cost: 1,
-      attack: 12,
-      effect: 'Self damage',
+      effect: 'Next turn player draw one card less',
       class: 'monster',
-      rarity: 'rare'
+      rarity: 'common',
+      types: [CardType.SKILL]
+    },
+    {
+      id: 'goblin_slingshot',
+      name: 'Slingshot',
+      description: 'Deal 6 damage',
+      cost: 1,
+      attack: 6,
+      class: 'monster',
+      rarity: 'common',
+      types: [CardType.RANGED, CardType.ATTACK]
+    },
+    {
+      id: 'goblin_bite',
+      name: 'Bite',
+      description: 'Deal 6 damage',
+      cost: 1,
+      attack: 6,
+      class: 'monster',
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
+    },
+    {
+      id: 'goblin_cower',
+      name: 'Cower',
+      description: 'Gain 1 Evasive',
+      cost: 2,
+      effect: 'Gain 1 Evasive',
+      class: 'monster',
+      rarity: 'common',
+      types: [CardType.SKILL]
+    },
+    {
+      id: 'goblin_booby_trap',
+      name: 'Booby Trap',
+      description: 'If last turn prevented damage from an attack, deal 10 damage',
+      cost: 2,
+      attack: 10,
+      effect: 'If last turn prevented damage from an attack, deal 10 damage',
+      class: 'monster',
+      rarity: 'common',
+      types: [CardType.SKILL]
+    },
+    {
+      id: 'goblin_cower_volatile',
+      name: 'Cower',
+      description: 'Gain 1 Evasive. Volatile.',
+      cost: 2,
+      effect: 'Gain 1 Evasive',
+      class: 'monster',
+      rarity: 'common',
+      types: [CardType.SKILL, CardType.VOLATILE]
     }
   ],
   undead: [
     {
       id: 'undead_touch',
-      name: 'life Drain',
+      name: 'Life Drain',
       description: 'Deal 5 damage. Heal 3 health',
       cost: 1,
       attack: 5,
       effect: 'Lifesteal',
       class: 'undead',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.ATTACK]
     },
     {
       id: 'undead_curse',
-      name: 'death Curse',
+      name: 'Death Curse',
       description: 'Apply 3 poison',
       cost: 2,
       effect: 'Apply 3 poison',
       class: 'undead',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.CURSE]
     },
     {
       id: 'undead_summon',
-      name: 'raise Dead',
+      name: 'Raise Dead',
       description: 'Summon 2 skeletons (6 damage each)',
       cost: 3,
       attack: 12,
       effect: 'Summon minions',
       class: 'undead',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.POWER]
     }
   ],
   warrior: [
     {
       id: 'enemy_warrior_strike',
-      name: 'warrior Strike',
+      name: 'Warrior Strike',
       description: 'Deal 7 damage',
       cost: 1,
       attack: 7,
       class: 'warrior',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'enemy_warrior_shield',
-      name: 'iron Shield',
+      name: 'Iron Shield',
       description: 'Gain 8 block',
       cost: 1,
       defense: 8,
       class: 'warrior',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.SKILL]
     },
     {
       id: 'enemy_warrior_whirlwind',
-      name: 'whirlwind',
+      name: 'Whirlwind',
       description: 'Deal 5 damage to all enemies',
       cost: 2,
       attack: 5,
       effect: 'AoE damage',
       class: 'warrior',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.MELEE, CardType.ATTACK]
     }
   ],
   rogue: [
     {
       id: 'enemy_rogue_dagger',
-      name: 'quick Dagger',
+      name: 'Quick Dagger',
       description: 'Deal 6 damage',
       cost: 0,
       attack: 6,
       class: 'rogue',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'enemy_rogue_poison',
-      name: 'poison Blade',
+      name: 'Poison Blade',
       description: 'Deal 4 damage. Apply 2 poison',
       cost: 1,
       attack: 4,
       effect: 'Apply 2 poison',
       class: 'rogue',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.MELEE, CardType.ATTACK]
     },
     {
       id: 'enemy_rogue_shadow',
-      name: 'shadow Strike',
+      name: 'Shadow Strike',
       description: 'Deal 12 damage',
       cost: 2,
       attack: 12,
       class: 'rogue',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.MELEE, CardType.ATTACK]
     }
   ],
   wizard: [
     {
       id: 'enemy_wizard_missile',
-      name: 'magic Missile',
+      name: 'Magic Missile',
       description: 'Deal 5 damage',
       cost: 1,
       attack: 5,
       class: 'wizard',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.ATTACK]
     },
     {
       id: 'enemy_wizard_shield',
-      name: 'magic Barrier',
+      name: 'Magic Barrier',
       description: 'Gain 7 block',
       cost: 1,
       defense: 7,
       class: 'wizard',
-      rarity: 'common'
+      rarity: 'common',
+      types: [CardType.SKILL]
     },
     {
       id: 'enemy_wizard_bolt',
-      name: 'lightning Bolt',
+      name: 'Lightning Bolt',
       description: 'Deal 11 damage',
       cost: 2,
       attack: 11,
       class: 'wizard',
-      rarity: 'rare'
+      rarity: 'rare',
+      types: [CardType.ATTACK]
     }
   ]
 };
@@ -504,38 +616,76 @@ export const passives: Record<PlayerClass, Passive[]> = {
   ]
 };
 
+// Opponent Passives
+export const opponentPassives: Record<string, OpponentPassive[]> = {
+  wolf: [
+    {
+      id: 'wolf_ambush',
+      name: 'Ambush',
+      description: 'I play first in battle',
+      effect: 'opponent_goes_first'
+    }
+  ],
+  goblin: [
+    {
+      id: 'goblin_coward',
+      name: 'Coward',
+      description: 'When your turn starts, if you have less than 50% health, add a volatile free Cower in your hand.',
+      effect: 'start_of_turn_coward'
+    }
+  ]
+};
+
 // Opponents
 export const opponents: Opponent[] = [
   {
     id: 'goblin',
-    name: 'goblin Warrior',
+    name: 'goblin Hunter',
     type: 'monster',
     health: 30,
     maxHealth: 30,
     portrait: "https://i.imgur.com/tN5et02.jpeg",
     deck: {
       cards: [
-        ...opponentCards.monster.slice(0, 2),
-        ...opponentCards.monster.slice(2, 3)
+        ...opponentCards.monster.slice(0, 1), // Dirty Trick (copy 1)
+        ...opponentCards.monster.slice(0, 1), // Dirty Trick (copy 2)
+        ...opponentCards.monster.slice(1, 2), // Slingshot (copy 1)
+        ...opponentCards.monster.slice(1, 2), // Slingshot (copy 2)
+        ...opponentCards.monster.slice(2, 3), // Bite (copy 1)
+        ...opponentCards.monster.slice(2, 3), // Bite (copy 2)
+        ...opponentCards.monster.slice(3, 4), // Cower (copy 1)
+        ...opponentCards.monster.slice(3, 4), // Cower (copy 2)
+        ...opponentCards.monster.slice(4, 5), // Booby Trap (copy 1)
+        ...opponentCards.monster.slice(4, 5), // Booby Trap (copy 2)
       ],
       discardPile: []
     },
+    passive: opponentPassives.goblin[0],
     difficulty: 'basic'
   },
   {
     id: 'wolf',
-    name: 'alpha Wolf',
+    name: 'Alpha Wolf',
     type: 'beast',
-    health: 35,
-    maxHealth: 35,
+    health: 42,
+    maxHealth: 42,
     portrait: "https://i.imgur.com/0TFnwFH.png",
     deck: {
       cards: [
-        ...opponentCards.beast.slice(0, 2),
-        ...opponentCards.beast.slice(2, 3)
+        ...opponentCards.beast.slice(0, 1), // Alpha Claws
+        ...opponentCards.beast.slice(0, 1), // Alpha Claws (2nd copy)
+        ...opponentCards.beast.slice(1, 2), // Vicious Bite
+        ...opponentCards.beast.slice(1, 2), // Vicious Bite (2nd copy)
+        ...opponentCards.beast.slice(2, 3), // Terrifying Howl
+        ...opponentCards.beast.slice(2, 3), // Terrifying Howl (2nd copy)
+        ...opponentCards.beast.slice(3, 4), // Call the Pack
+        ...opponentCards.beast.slice(3, 4), // Call the Pack (2nd copy)
+        ...opponentCards.beast.slice(6, 7), // Killing Instinct (fixed index!)
+        ...opponentCards.beast.slice(6, 7), // Killing Instinct (2nd copy)
       ],
       discardPile: []
     },
+    passive: opponentPassives.wolf[0],
     difficulty: 'basic'
   },
   {

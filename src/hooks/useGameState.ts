@@ -26,15 +26,25 @@ export const useGameState = () => {
     const battleState = initializeBattle(player, opponent);
     
     // Draw 3 cards for player's first turn using proper draw mechanics
+    // BUT only if it's the player's turn (no ambush)
     const updatedBattleState = { ...battleState };
-    const drawResult = drawCardsWithReshuffle(
-      updatedBattleState.playerDeck, 
-      updatedBattleState.playerDiscardPile, 
-      3
-    );
-    updatedBattleState.playerHand = drawResult.drawnCards;
-    updatedBattleState.playerDeck = drawResult.updatedDeck;
-    updatedBattleState.playerDiscardPile = drawResult.updatedDiscardPile;
+    
+    if (battleState.turn === 'player') {
+      // Normal case: player goes first, draw 3 cards
+      console.log('useGameState: Normal case - player goes first, drawing 3 cards');
+      const drawResult = drawCardsWithReshuffle(
+        updatedBattleState.playerDeck, 
+        updatedBattleState.playerDiscardPile, 
+        3
+      );
+      updatedBattleState.playerHand = drawResult.drawnCards;
+      updatedBattleState.playerDeck = drawResult.updatedDeck;
+      updatedBattleState.playerDiscardPile = drawResult.updatedDiscardPile;
+    } else {
+      // Ambush case: opponent goes first, player starts with empty hand
+      console.log('useGameState: Ambush case - opponent goes first, player hand remains empty');
+      // playerHand should already be empty from initializeBattle
+    }
 
     const newGameState = {
       player,

@@ -3,7 +3,9 @@ export enum CardType {
   ATTACK = 'attack',
   SKILL = 'skill',
   POWER = 'power',
-  CURSE = 'curse'
+  CURSE = 'curse',
+  MINION = 'minion',
+  VOLATILE = 'volatile'
 }
 
 export interface Card {
@@ -15,8 +17,9 @@ export interface Card {
   defense?: number;
   effect?: string;
   class: PlayerClass | OpponentType;
-  rarity: 'common' | 'rare' | 'epic';
+  rarity: 'common' | 'rare' | 'epic' | 'special';
   types?: CardType[];
+  unplayable?: boolean;
 }
 
 export interface Passive {
@@ -24,6 +27,13 @@ export interface Passive {
   name: string;
   description: string;
   class: PlayerClass;
+  effect: string;
+}
+
+export interface OpponentPassive {
+  id: string;
+  name: string;
+  description: string;
   effect: string;
 }
 
@@ -52,6 +62,7 @@ export interface Opponent {
   portrait: string;
   deck: Deck;
   difficulty: 'basic' | 'medium' | 'boss';
+  passive?: OpponentPassive;
 }
 
 export type GamePhase = 
@@ -73,9 +84,16 @@ export interface GameState {
 }
 
 export interface StatusEffect {
-  type: 'weak' | 'vulnerable' | 'strength' | 'dexterity';
+  type: 'weak' | 'vulnerable' | 'strength' | 'dexterity' | 'bleeding' | 'evasive';
   value: number;
   duration: number;
+}
+
+export interface DrawModification {
+  type: 'add' | 'subtract' | 'set';
+  value: number;
+  source: string; // Card name or effect source
+  duration: number; // Number of turns this effect lasts (0 = permanent for this battle)
 }
 
 export interface BattleState {
@@ -94,6 +112,8 @@ export interface BattleState {
   playerStatusEffects: StatusEffect[];
   opponentStatusEffects: StatusEffect[];
   playerPersistentBlock: boolean;
+  playerDrawModifications: DrawModification[];
+  opponentDrawModifications: DrawModification[];
   battleLog: string[];
 }
 

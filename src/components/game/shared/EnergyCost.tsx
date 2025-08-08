@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Player } from '@/types/game';
-import { Zap } from 'lucide-react';
+import { Diamond } from 'lucide-react';
 import { getCardCost } from '@/lib/gameUtils';
 
 interface EnergyCostProps {
@@ -20,7 +20,9 @@ export const EnergyCost: React.FC<EnergyCostProps> = ({
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: actualCost }, (_, i) => (
-        <Zap key={i} className="w-3 h-3 text-blue-500" />
+        <div key={i} className="w-3 h-3 rounded-full bg-green-500 flex items-center justify-center">
+          <Diamond className="w-1.5 h-1.5 text-white" />
+        </div>
       ))}
     </div>
   );

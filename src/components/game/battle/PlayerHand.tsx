@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Player, BattleState, Card } from '@/types/game';
 import { Card as CardComponent, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EnergyCost } from '@/components/game/shared/EnergyCost';
 import { CardTypes } from '@/components/game/shared/CardTypes';
+import { CardEffectText } from '@/components/game/shared/CardEffectText';
 
 interface PlayerHandProps {
   player: Player;
@@ -17,6 +18,13 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   onCardPlay,
   canPlayCard
 }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const handleCardClick = (card: Card) => {
+    if (!isModalOpen && battleState.turn === 'player' && canPlayCard(card)) {
+      onCardPlay(card);
+    }
+  };
   return (
     <div>
       <h3 className="text-xl font-semibold card-title mb-4">Your Hand ({battleState.playerHand.length}/5)</h3>
@@ -25,9 +33,9 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
           <CardComponent 
             key={index} 
             className={`cursor-pointer hover:shadow-md transition-all custom-hover ${
-              !canPlayCard(card) ? 'opacity-50' : ''
-            } ${battleState.turn === 'player' ? 'hover:scale-105' : ''}`}
-            onClick={() => battleState.turn === 'player' && canPlayCard(card) && onCardPlay(card)}
+              !canPlayCard(card) || isModalOpen ? 'opacity-50' : ''
+            } ${battleState.turn === 'player' && !isModalOpen ? 'hover:scale-105' : ''}`}
+            onClick={() => handleCardClick(card)}
           >
             <CardHeader className="pb-1">
               <div className="flex justify-between items-start">
@@ -36,8 +44,12 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <CardTypes types={card.types} className="mb-2" />
-              <CardDescription className="text-sm gothic-text">{card.description}</CardDescription>
+              <CardTypes 
+                types={card.types} 
+                className="mb-2" 
+                onModalOpenChange={setIsModalOpen}
+              />
+              <CardEffectText description={card.description} className="text-sm gothic-text" />
             </CardContent>
           </CardComponent>
         ))}

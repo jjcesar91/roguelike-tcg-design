@@ -2,7 +2,7 @@ import React from 'react';
 import { Player, Opponent, BattleState } from '@/types/game';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Heart, Shield, Zap, Skull } from 'lucide-react';
+import { Heart, Shield, Skull, Diamond } from 'lucide-react';
 import { StatusEffects } from '@/components/game/shared/StatusEffects';
 import { playerClasses } from '@/data/gameData';
 
@@ -57,12 +57,13 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
         )}
         <StatusEffects 
           effects={battleState.playerStatusEffects} 
-          showTitle={true} 
-          title="Player Effects" 
+          isOpponent={false}
         />
         <div className="flex items-center gap-1 mt-2">
           {Array.from({ length: battleState.playerEnergy }, (_, i) => (
-            <Zap key={i} className="w-4 h-4 text-blue-500" />
+            <div key={i} className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+              <Diamond className="w-2 h-2 text-white" />
+            </div>
           ))}
         </div>
       </div>
@@ -106,7 +107,10 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
             <Shield className="w-4 h-4 text-blue-500" />
           </div>
         )}
-        <StatusEffects effects={battleState.opponentStatusEffects} showTitle={false} />
+        <StatusEffects 
+          effects={battleState.opponentStatusEffects} 
+          isOpponent={true}
+        />
       </div>
     </div>
   );
