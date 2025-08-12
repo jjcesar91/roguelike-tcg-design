@@ -1,4 +1,5 @@
 import { Card, Passive, Opponent, PlayerClass, OpponentType, CardType } from '@/types/game';
+import { extraCards, extraOpponents, extraPassives, extraClasses } from '@/content';
 import { Swords, Skull, Zap, VenetianMask } from 'lucide-react';
 
 // Player Classes Configuration
@@ -753,3 +754,13 @@ export const opponents: Opponent[] = [
     difficulty: 'boss'
   }
 ];
+
+// ---- Extension Helpers (non-breaking) ----
+export const getAllPlayerClasses = () => ({ ...playerClasses, ...Object.fromEntries((extraClasses as any[]).map((c:any)=>[c.id, c])) });
+export const getAllPlayerCards = () => ({
+  warrior: [...playerCards.warrior, ...((extraCards as any[]).filter((c:any)=>c.class==='warrior'))],
+  rogue: [...playerCards.rogue, ...((extraCards as any[]).filter((c:any)=>c.class==='rogue'))],
+  wizard: [...playerCards.wizard, ...((extraCards as any[]).filter((c:any)=>c.class==='wizard'))]
+});
+export const getAllOpponents = () => ([...opponents, ...extraOpponents as any]);
+export const getAllPassives = () => ([...passives, ...extraPassives as any]);

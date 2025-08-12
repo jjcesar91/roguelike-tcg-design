@@ -1,25 +1,26 @@
+import { dbg } from '@/lib/debug';
 import { PlayerClass, Player, Opponent } from '@/types/game';
 import { createPlayer, getRandomOpponent, initializeBattle, drawCardsWithReshuffle } from '@/lib/gameUtils';
 import { BattleHandler } from '../handlers/BattleHandler';
 
 export class ClassHandler {
   static handleClassSelect(playerClass: PlayerClass) {
-    console.log('handleClassSelect called with:', playerClass);
+    dbg('handleClassSelect called with:', playerClass);
     
     const player = createPlayer(playerClass);
-    console.log('Player created:', player);
-    console.log('Player level:', player.level);
+    dbg('Player created:', player);
+    dbg('Player level:', player.level);
     
     const opponent = getRandomOpponent('basic');
-    console.log('Opponent created:', opponent);
-    console.log('Opponent difficulty:', opponent.difficulty);
-    console.log('Opponent name:', opponent.name);
+    dbg('Opponent created:', opponent);
+    dbg('Opponent difficulty:', opponent.difficulty);
+    dbg('Opponent name:', opponent.name);
     
     const battleState = initializeBattle(player, opponent);
-    console.log('Battle state created:', battleState);
-    console.log('First turn:', battleState.turn);
-    console.log('Player hand from initializeBattle:', battleState.playerHand);
-    console.log('Player hand length from initializeBattle:', battleState.playerHand.length);
+    dbg('Battle state created:', battleState);
+    dbg('First turn:', battleState.turn);
+    dbg('Player hand from initializeBattle:', battleState.playerHand);
+    dbg('Player hand length from initializeBattle:', battleState.playerHand.length);
 
     // If opponent has ambush and goes first, don't draw player cards yet
     // The opponent will play their turn first
@@ -27,7 +28,7 @@ export class ClassHandler {
     
     if (battleState.turn === 'player') {
       // Normal case: player goes first, draw 3 cards
-      console.log('Normal case - player goes first, drawing 3 cards');
+      dbg('Normal case - player goes first, drawing 3 cards');
       const drawResult = drawCardsWithReshuffle(
         updatedBattleState.playerDeck, 
         updatedBattleState.playerDiscardPile, 
@@ -36,15 +37,15 @@ export class ClassHandler {
       updatedBattleState.playerHand = drawResult.drawnCards;
       updatedBattleState.playerDeck = drawResult.updatedDeck;
       updatedBattleState.playerDiscardPile = drawResult.updatedDiscardPile;
-      console.log('Player hand after drawing:', updatedBattleState.playerHand);
+      dbg('Player hand after drawing:', updatedBattleState.playerHand);
     } else {
       // Ambush case: opponent goes first, player starts with empty hand
-      console.log('Ambush activated - opponent goes first, player hand should be empty');
-      console.log('Player hand in ambush case:', updatedBattleState.playerHand);
+      dbg('Ambush activated - opponent goes first, player hand should be empty');
+      dbg('Player hand in ambush case:', updatedBattleState.playerHand);
     }
 
-    console.log('Final player hand being returned:', updatedBattleState.playerHand);
-    console.log('Final player hand length:', updatedBattleState.playerHand.length);
+    dbg('Final player hand being returned:', updatedBattleState.playerHand);
+    dbg('Final player hand length:', updatedBattleState.playerHand.length);
 
     return {
       player,

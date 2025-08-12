@@ -1,3 +1,4 @@
+import { dbg } from '@/lib/debug';
 import { Card, Player } from '@/types/game';
 import { replaceCardInDeck, getRandomOpponent, initializeBattle, drawCardsWithReshuffle, getRandomCards } from '@/lib/gameUtils';
 
@@ -15,7 +16,7 @@ export class SelectionHandler {
       difficulty = 'boss';        // fallback
     }
     
-    console.log(`Player level: ${player.level}, selecting opponent difficulty: ${difficulty}`);
+    dbg(`Player level: ${player.level}, selecting opponent difficulty: ${difficulty}`);
     
     const opponent = getRandomOpponent(difficulty);
     const battleState = initializeBattle(newPlayer, opponent);

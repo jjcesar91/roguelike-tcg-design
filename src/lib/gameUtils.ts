@@ -1,11 +1,12 @@
+import { dbg } from '@/lib/debug';
 import { Card, Player, Opponent, BattleState, PlayerClass, GameState, Deck, CardType, DrawModification } from '@/types/game';
 import * as gameData from '@/data/gameData';
 
-console.log('gameUtils.ts loaded');
-console.log('gameData import:', gameData);
-console.log('playerCards:', gameData.playerCards);
-console.log('opponents:', gameData.opponents);
-console.log('passives:', gameData.passives);
+dbg('gameUtils.ts loaded');
+dbg('gameData import:', gameData);
+dbg('playerCards:', gameData.playerCards);
+dbg('opponents:', gameData.opponents);
+dbg('passives:', gameData.passives);
 
 // Use the imported data
 const playerCards = gameData.playerCards;
@@ -35,15 +36,15 @@ export function shuffleDeck(deck: Card[]): Card[] {
 }
 
 export function createPlayer(playerClass: PlayerClass): Player {
-  console.log('Creating player for class:', playerClass);
-  console.log('Available playerCards:', Object.keys(playerCards));
-  console.log('playerCards[playerClass]:', playerCards[playerClass]);
+  dbg('Creating player for class:', playerClass);
+  dbg('Available playerCards:', Object.keys(playerCards));
+  dbg('playerCards[playerClass]:', playerCards[playerClass]);
   
   const classCards = playerCards[playerClass].slice(0, 3); // First 3 cards
-  console.log('Class cards selected:', classCards);
+  dbg('Class cards selected:', classCards);
   
   const deck = createDeck(classCards, 3);
-  console.log('Deck created:', deck);
+  dbg('Deck created:', deck);
 
   return {
     class: playerClass,
@@ -58,14 +59,14 @@ export function createPlayer(playerClass: PlayerClass): Player {
 }
 
 export function getRandomOpponent(difficulty: 'basic' | 'medium' | 'boss'): Opponent {
-  console.log('Getting random opponent for difficulty:', difficulty);
-  console.log('Available opponents:', opponents);
+  dbg('Getting random opponent for difficulty:', difficulty);
+  dbg('Available opponents:', opponents);
   const availableOpponents = opponents.filter(opp => opp.difficulty === difficulty);
-  console.log('Available opponents for difficulty:', availableOpponents);
+  dbg('Available opponents for difficulty:', availableOpponents);
   const randomOpponent = availableOpponents[Math.floor(Math.random() * availableOpponents.length)];
-  console.log('Selected opponent:', randomOpponent);
-  console.log('Opponent deck:', randomOpponent.deck);
-  console.log('Opponent deck cards:', randomOpponent.deck?.cards);
+  dbg('Selected opponent:', randomOpponent);
+  dbg('Opponent deck:', randomOpponent.deck);
+  dbg('Opponent deck cards:', randomOpponent.deck?.cards);
   
   return {
     ...randomOpponent,
@@ -77,14 +78,14 @@ export function getRandomOpponent(difficulty: 'basic' | 'medium' | 'boss'): Oppo
 }
 
 export function initializeBattle(player: Player, opponent: Opponent): BattleState {
-  console.log('Initializing battle...');
-  console.log('Player:', player);
-  console.log('Player deck:', player.deck);
-  console.log('Player deck cards:', player.deck?.cards);
-  console.log('Opponent:', opponent);
-  console.log('Opponent deck:', opponent.deck);
-  console.log('Opponent deck cards:', opponent.deck?.cards);
-  console.log('Opponent passive:', opponent.passive);
+  dbg('Initializing battle...');
+  dbg('Player:', player);
+  dbg('Player deck:', player.deck);
+  dbg('Player deck cards:', player.deck?.cards);
+  dbg('Opponent:', opponent);
+  dbg('Opponent deck:', opponent.deck);
+  dbg('Opponent deck cards:', opponent.deck?.cards);
+  dbg('Opponent passive:', opponent.passive);
   
   // Create copies of decks for battle
   const playerDeckCopy = {
@@ -96,18 +97,18 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
     discardPile: [...opponent.deck.discardPile]
   };
   
-  console.log('Player deck copy:', playerDeckCopy);
-  console.log('Opponent deck copy:', opponentDeckCopy);
-  console.log('Opponent deck copy cards length:', opponentDeckCopy.cards.length);
-  console.log('Opponent deck copy cards:', opponentDeckCopy.cards);
+  dbg('Player deck copy:', playerDeckCopy);
+  dbg('Opponent deck copy:', opponentDeckCopy);
+  dbg('Opponent deck copy cards length:', opponentDeckCopy.cards.length);
+  dbg('Opponent deck copy cards:', opponentDeckCopy.cards);
   
   // Check if opponent has ambush passive
   const hasAmbush = opponent.passive && opponent.passive.effect === 'opponent_goes_first';
-  console.log('Opponent has ambush:', hasAmbush);
+  dbg('Opponent has ambush:', hasAmbush);
   
   // Determine who goes first
   const firstTurn = hasAmbush ? 'opponent' : 'player';
-  console.log('First turn:', firstTurn);
+  dbg('First turn:', firstTurn);
   
   // Draw initial hands
   const playerHand: Card[] = [];
@@ -314,7 +315,7 @@ export function shuffleCardsIntoDeck(deck: Deck, cardsToAdd: Card[]): Deck {
 }
 
 export function createWolfMinionCards(): Card[] {
-  console.log('=== CREATE WOLF MINION CARDS DEBUG ===');
+  dbg('=== CREATE WOLF MINION CARDS DEBUG ===');
   // Create 2 Wolf minion cards
   const wolfMinions = [
     {
@@ -342,8 +343,8 @@ export function createWolfMinionCards(): Card[] {
       unplayable: true
     }
   ];
-  console.log('Created wolf minions:', wolfMinions);
-  console.log('=== CREATE WOLF MINION CARDS COMPLETE ===');
+  dbg('Created wolf minions:', wolfMinions);
+  dbg('=== CREATE WOLF MINION CARDS COMPLETE ===');
   return wolfMinions;
 }
 
@@ -790,32 +791,32 @@ export function playCard(
   const cost = getCardCost(card, player);
   
   // Special handling for Call the Pack - handle it immediately and directly
-  console.log('=== CALL THE PACK DEBUG ===');
-  console.log('Card being played:', card);
-  console.log('Card name:', card.name);
-  console.log('Card ID:', card.id);
-  console.log('Card name lowercase:', card.name?.toLowerCase());
-  console.log('Includes "call the pack":', card.name?.toLowerCase().includes('call the pack'));
-  console.log('ID check - call_pack:', card.id === 'call_pack');
-  console.log('ID check - beast_pack_mentality:', card.id === 'beast_pack_mentality');
+  dbg('=== CALL THE PACK DEBUG ===');
+  dbg('Card being played:', card);
+  dbg('Card name:', card.name);
+  dbg('Card ID:', card.id);
+  dbg('Card name lowercase:', card.name?.toLowerCase());
+  dbg('Includes "call the pack":', card.name?.toLowerCase().includes('call the pack'));
+  dbg('ID check - call_pack:', card.id === 'call_pack');
+  dbg('ID check - beast_pack_mentality:', card.id === 'beast_pack_mentality');
   
   if ((card.name && card.name.toLowerCase().includes('call the pack')) || 
       (card.id && (card.id === 'call_pack' || card.id === 'beast_pack_mentality'))) {
     
-    console.log('✅ CALL THE PACK CARD DETECTED! Processing directly...');
+    dbg('✅ CALL THE PACK CARD DETECTED! Processing directly...');
     
     // Remove card from hand
     const cardIndex = battleState.playerHand.findIndex(c => c.id === card.id);
-    console.log('Card index in hand:', cardIndex);
+    dbg('Card index in hand:', cardIndex);
     if (cardIndex !== -1) {
-      console.log('Removing card from hand at index:', cardIndex);
+      dbg('Removing card from hand at index:', cardIndex);
       battleState.playerHand.splice(cardIndex, 1);
     }
     
     // Add Wolf minions to player's discard pile
-    console.log('Creating Wolf minions...');
+    dbg('Creating Wolf minions...');
     const wolfMinions = createWolfMinionCards();
-    console.log('Wolf minions created:', wolfMinions);
+    dbg('Wolf minions created:', wolfMinions);
     
     const newBattleState = {
       ...battleState,
@@ -825,12 +826,12 @@ export function playCard(
       playerPlayedCards: [...battleState.playerPlayedCards, card]
     };
     
-    console.log('New battle state discard pile:', newBattleState.playerDiscardPile);
-    console.log('Discard pile length:', newBattleState.playerDiscardPile.length);
+    dbg('New battle state discard pile:', newBattleState.playerDiscardPile);
+    dbg('Discard pile length:', newBattleState.playerDiscardPile.length);
     
     log.push(formatLogText(`Player added 2 Wolf to their discard pile`, player.class, opponent.name, card.name));
     
-    console.log('=== CALL THE PACK PROCESSING COMPLETE ===');
+    dbg('=== CALL THE PACK PROCESSING COMPLETE ===');
     return { 
       newPlayer: player, 
       newOpponent: opponent, 
@@ -838,7 +839,7 @@ export function playCard(
       log 
     };
   }
-  console.log('❌ CALL THE PACK CARD NOT DETECTED, continuing with normal processing...');
+  dbg('❌ CALL THE PACK CARD NOT DETECTED, continuing with normal processing...');
   
   if (!canPlayCard(card, player, battleState.playerEnergy, battleState)) {
     return { newPlayer: player, newOpponent: opponent, newBattleState: battleState, log: [formatLogText('Not enough energy or card conditions not met!', player.class, opponent.name)] };
@@ -889,15 +890,15 @@ export function playCard(
     // Check if the attack was evaded
     if (damageResult.evaded) {
       const evasiveMessage = formatLogText(`${opponent.name}'s Evasive prevented damage from player's ${card.name}`, player.class, opponent.name, card.name);
-      console.log('=== EVASIVE DEBUG ===');
-      console.log('Raw message:', `${opponent.name}'s Evasive prevented damage from player's ${card.name}`);
-      console.log('Formatted message:', evasiveMessage);
-      console.log('Player class:', player.class);
-      console.log('Opponent name:', opponent.name);
-      console.log('Card name:', card.name);
-      console.log('Contains target pattern?', evasiveMessage.includes("'s Evasive prevented damage from"));
-      console.log('About to push to battle log');
-      console.log('=== END EVASIVE DEBUG ===');
+      dbg('=== EVASIVE DEBUG ===');
+      dbg('Raw message:', `${opponent.name}'s Evasive prevented damage from player's ${card.name}`);
+      dbg('Formatted message:', evasiveMessage);
+      dbg('Player class:', player.class);
+      dbg('Opponent name:', opponent.name);
+      dbg('Card name:', card.name);
+      dbg('Contains target pattern?', evasiveMessage.includes("'s Evasive prevented damage from"));
+      dbg('About to push to battle log');
+      dbg('=== END EVASIVE DEBUG ===');
       log.push(evasiveMessage);
       // Consume one Evasive stack
       newBattleState.opponentStatusEffects = consumeEvasiveStack(newBattleState.opponentStatusEffects);
@@ -991,15 +992,15 @@ export function playCard(
         shouldLog = true;
         logMessage = `Player takes ${selfDamage} self damage from ${card.name}`;
       } else if ((card.name && card.name.toLowerCase().includes('call the pack')) || (card.id && (card.id === 'call_pack' || card.id === 'beast_pack_mentality'))) {
-        console.log('🔄 FALLBACK CALL THE PACK HANDLING - This should NOT be reached if direct handling worked!');
-        console.log('Card being processed in fallback:', card);
+        dbg('🔄 FALLBACK CALL THE PACK HANDLING - This should NOT be reached if direct handling worked!');
+        dbg('Card being processed in fallback:', card);
         // Special handling for Call the Pack - check by card name directly
         shouldLog = true;
         // Create Wolf minion cards and add them to player's discard pile
         const wolfMinions = createWolfMinionCards();
-        console.log('Wolf minions created in fallback:', wolfMinions);
+        dbg('Wolf minions created in fallback:', wolfMinions);
         newBattleState.playerDiscardPile = [...newBattleState.playerDiscardPile, ...wolfMinions];
-        console.log('Updated discard pile in fallback:', newBattleState.playerDiscardPile);
+        dbg('Updated discard pile in fallback:', newBattleState.playerDiscardPile);
         logMessage = `Player added 2 Wolf to their discard pile (FALLBACK)`;
       } else if (card.effect.includes('shuffle') || card.effect.includes('summon') || card.effect.includes('minion')) {
         // Other deck manipulation or summoning effects
@@ -1029,7 +1030,7 @@ function playSingleOpponentCard(
   remainingEnergy: number,
   log: string[]
 ): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
-  console.log('🎮 Playing single opponent card:', cardToPlay.name);
+  dbg('🎮 Playing single opponent card:', cardToPlay.name);
   
   let newPlayer = { ...player };
   let newOpponent = { ...opponent };
@@ -1038,7 +1039,7 @@ function playSingleOpponentCard(
   // Check if the card is Call the Pack
   if ((cardToPlay.name && cardToPlay.name.toLowerCase().includes('call the pack')) || 
       (cardToPlay.id && (cardToPlay.id === 'call_pack' || cardToPlay.id === 'beast_pack_mentality'))) {
-    console.log('✅ SINGLE CARD: CALL THE PACK DETECTED!');
+    dbg('✅ SINGLE CARD: CALL THE PACK DETECTED!');
     
     // Remove card from opponent hand
     const cardIndex = newBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
@@ -1060,7 +1061,7 @@ function playSingleOpponentCard(
   }
   
   // Normal card processing for non-Call the Pack cards
-  console.log('🎮 Processing normal card:', cardToPlay.name);
+  dbg('🎮 Processing normal card:', cardToPlay.name);
   
   // Remove the card from opponent's hand and add to discard pile
   const cardIndex = newBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
@@ -1146,7 +1147,7 @@ function playSingleOpponentCard(
     }
   }
   
-  console.log('✅ Single card play complete:', cardToPlay.name);
+  dbg('✅ Single card play complete:', cardToPlay.name);
   return { newPlayer, newOpponent, newBattleState, log };
 }
 
@@ -1156,9 +1157,9 @@ export function opponentPlayCard(
   battleState: BattleState,
   specificCard?: Card  // Optional parameter to play a specific card
 ): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
-  console.log('=== OPPONENT PLAY CARD FUNCTION CALLED ===');
-  console.log('This is the CORRECT function with Call the Pack handling!');
-  console.log('Specific card to play:', specificCard?.name);
+  dbg('=== OPPONENT PLAY CARD FUNCTION CALLED ===');
+  dbg('This is the CORRECT function with Call the Pack handling!');
+  dbg('Specific card to play:', specificCard?.name);
   
   const log: string[] = [];
   let currentPlayer = { ...player };
@@ -1177,81 +1178,81 @@ export function opponentPlayCard(
   if (specificCard) {
     // Verify the specific card is actually playable
     cardToPlay = playableCards.find(card => card.id === specificCard.id);
-    console.log('Looking for specific card:', specificCard.name, 'Found:', cardToPlay?.name);
+    dbg('Looking for specific card:', specificCard.name, 'Found:', cardToPlay?.name);
   }
   
   // If no specific card or specific card not found, use prioritization logic
   if (!cardToPlay) {
-    console.log('=== OPPONENT CALL THE PACK DEBUG ===');
-    console.log('Playable cards:', playableCards.map(c => ({ name: c.name, id: c.id })));
+    dbg('=== OPPONENT CALL THE PACK DEBUG ===');
+    dbg('Playable cards:', playableCards.map(c => ({ name: c.name, id: c.id })));
     
     cardToPlay = playableCards.find(card => {
-      console.log('Checking card:', card.name, card.id);
-      console.log('Name includes "call the pack":', card.name?.toLowerCase().includes('call the pack'));
-      console.log('ID matches call_pack:', card.id === 'call_pack');
-      console.log('ID matches beast_pack_mentality:', card.id === 'beast_pack_mentality');
+      dbg('Checking card:', card.name, card.id);
+      dbg('Name includes "call the pack":', card.name?.toLowerCase().includes('call the pack'));
+      dbg('ID matches call_pack:', card.id === 'call_pack');
+      dbg('ID matches beast_pack_mentality:', card.id === 'beast_pack_mentality');
       return (card.name && card.name.toLowerCase().includes('call the pack')) || 
              (card.id && (card.id === 'call_pack' || card.id === 'beast_pack_mentality'));
     });
     
-    console.log('Call the Pack card found:', cardToPlay);
+    dbg('Call the Pack card found:', cardToPlay);
     
     // If no Call the Pack card, just play the first playable card
     if (!cardToPlay && playableCards.length > 0) {
       cardToPlay = playableCards[0];
-      console.log('No Call the Pack found, playing first card:', cardToPlay.name);
+      dbg('No Call the Pack found, playing first card:', cardToPlay.name);
     }
   }
   
   // If no card can be played, return current state
   if (!cardToPlay) {
-    console.log('No card to play, returning current state');
+    dbg('No card to play, returning current state');
     return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
   }
   
   // Since this is the AI combination mode (no specific card), play using combination logic
-  console.log('🤖 AI combination mode - playing optimal combinations...');
+  dbg('🤖 AI combination mode - playing optimal combinations...');
   const lastTurnDamagePrevented = currentBattleState.battleLog.some(logEntry => 
     logEntry.includes("'s Evasive prevented") && logEntry.includes("from")
   );
   
-  console.log('=== BOOBY TRAP DEBUG ===');
-  console.log('Last turn damage prevented:', lastTurnDamagePrevented);
-  console.log('Total battle log entries:', currentBattleState.battleLog.length);
-  console.log('Battle log entries:', currentBattleState.battleLog);
-  console.log('Checking for Evasive logs:', currentBattleState.battleLog.filter(log => log.includes('Evasive')));
-  console.log('Looking for patterns: "' + "'s Evasive prevented" + '" and "' + "from" + '"');
-  console.log('Direct string check results:');
+  dbg('=== BOOBY TRAP DEBUG ===');
+  dbg('Last turn damage prevented:', lastTurnDamagePrevented);
+  dbg('Total battle log entries:', currentBattleState.battleLog.length);
+  dbg('Battle log entries:', currentBattleState.battleLog);
+  dbg('Checking for Evasive logs:', currentBattleState.battleLog.filter(log => log.includes('Evasive')));
+  dbg('Looking for patterns: "' + "'s Evasive prevented" + '" and "' + "from" + '"');
+  dbg('Direct string check results:');
   currentBattleState.battleLog.forEach((log, index) => {
     const hasEvasive = log.includes("'s Evasive prevented") && log.includes("from");
-    console.log(`[${index}]: "${log}" -> contains patterns: ${hasEvasive}`);
+    dbg(`[${index}]: "${log}" -> contains patterns: ${hasEvasive}`);
   });
-  console.log('=== END BOOBY TRAP DEBUG ===');
+  dbg('=== END BOOBY TRAP DEBUG ===');
   
   // If a specific card is provided, play just that card (respect the component's choice)
   if (specificCard) {
-    console.log('🎯 Playing specific card as requested by component:', specificCard.name);
+    dbg('🎯 Playing specific card as requested by component:', specificCard.name);
     
     // Verify the specific card is actually playable
     const foundCard = playableCards.find(card => card.id === specificCard.id);
     if (!foundCard) {
-      console.log('❌ Specific card not found in playable cards:', specificCard.name);
+      dbg('❌ Specific card not found in playable cards:', specificCard.name);
       return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
     }
     
     if (foundCard.cost > remainingEnergy) {
-      console.log('❌ Not enough energy for specific card:', foundCard.name, 'Cost:', foundCard.cost, 'Energy:', remainingEnergy);
+      dbg('❌ Not enough energy for specific card:', foundCard.name, 'Cost:', foundCard.cost, 'Energy:', remainingEnergy);
       return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
     }
     
-    console.log('✅ Playing specific card:', foundCard.name);
+    dbg('✅ Playing specific card:', foundCard.name);
     
     // Play just this one card
     return playSingleOpponentCard(foundCard, currentOpponent, currentPlayer, currentBattleState, remainingEnergy, log);
   }
   
   // If no specific card, use AI combination logic for full turn
-  console.log('🤖 No specific card provided, using AI combination logic...');
+  dbg('🤖 No specific card provided, using AI combination logic...');
   
   // Function to calculate combination score (prefers multiple cards)
   const calculateCombinationScore = (cards: Card[], totalCost: number): number => {
@@ -1443,15 +1444,15 @@ export function opponentPlayCard(
     const { combination, energyUsed } = findBestTurnCombination();
     
     if (combination.length === 0) {
-      console.log('No more playable cards with remaining energy:', remainingEnergy);
+      dbg('No more playable cards with remaining energy:', remainingEnergy);
       break;
     }
     
-    console.log('Playing combination:', combination.map(c => c.name), 'Energy used:', energyUsed);
+    dbg('Playing combination:', combination.map(c => c.name), 'Energy used:', energyUsed);
     
     // Play the selected combination
     for (const cardToPlay of combination) {
-      console.log('Playing card:', cardToPlay);
+      dbg('Playing card:', cardToPlay);
       
       // Remove the card from hand and add to discard pile (unless it's volatile)
       const cardIndex = currentBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
@@ -1463,7 +1464,7 @@ export function opponentPlayCard(
         if (!isVolatile) {
           currentBattleState.opponentDiscardPile = [...currentBattleState.opponentDiscardPile, removedCard];
         } else {
-          console.log(`Volatile card ${removedCard.name} was burned and removed from game`);
+          dbg(`Volatile card ${removedCard.name} was burned and removed from game`);
         }
       }
       
@@ -1645,9 +1646,9 @@ export function playOpponentCard(
   battleState: BattleState,
   cardToPlay: Card
 ): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
-  console.log('=== PLAY OPPONENT CARD START ===');
-  console.log('playOpponentCard called');
-  console.log('Card to play:', cardToPlay.name);
+  dbg('=== PLAY OPPONENT CARD START ===');
+  dbg('playOpponentCard called');
+  dbg('Card to play:', cardToPlay.name);
   
   const log: string[] = [];
   let newPlayer = { ...player };
@@ -1730,12 +1731,12 @@ export function playOpponentCard(
     }
   }
   
-  console.log('=== PLAY OPPONENT CARD END ===');
-  console.log('Final player health:', newPlayer.health);
-  console.log('Final opponent health:', newOpponent.health);
-  console.log('Final player block:', newBattleState.playerBlock);
-  console.log('Final opponent block:', newBattleState.opponentBlock);
-  console.log('Battle log entries:', log);
+  dbg('=== PLAY OPPONENT CARD END ===');
+  dbg('Final player health:', newPlayer.health);
+  dbg('Final opponent health:', newOpponent.health);
+  dbg('Final player block:', newBattleState.playerBlock);
+  dbg('Final opponent block:', newBattleState.opponentBlock);
+  dbg('Battle log entries:', log);
   
   return { newPlayer, newOpponent, newBattleState, log };
 }
@@ -1759,9 +1760,9 @@ export function drawCardsWithMinionEffects(
       if (currentDiscardPile.length > 0) {
         currentDeck.cards = shuffleDeck([...currentDiscardPile]);
         currentDiscardPile = [];
-        console.log('Deck empty, shuffled discard pile back into deck');
+        dbg('Deck empty, shuffled discard pile back into deck');
       } else {
-        console.log('No cards left to draw');
+        dbg('No cards left to draw');
         break;
       }
     }
@@ -1809,9 +1810,9 @@ export function drawCardsWithReshuffle(
       if (currentDiscardPile.length > 0) {
         currentDeck.cards = shuffleDeck([...currentDiscardPile]);
         currentDiscardPile = [];
-        console.log('Deck empty, shuffled discard pile back into deck');
+        dbg('Deck empty, shuffled discard pile back into deck');
       } else {
-        console.log('No cards left to draw');
+        dbg('No cards left to draw');
         break;
       }
     }
@@ -1819,7 +1820,7 @@ export function drawCardsWithReshuffle(
     if (currentDeck.cards.length > 0) {
       const card = currentDeck.cards.shift()!;
       drawnCards.push(card);
-      console.log(`Drew card: ${card.name}`);
+      dbg(`Drew card: ${card.name}`);
     }
   }
   
@@ -2005,7 +2006,7 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     
     log.push(...drawResult.minionDamageLog);
     
-    console.log(`Opponent drew ${drawResult.drawnCards.length} cards`);
+    dbg(`Opponent drew ${drawResult.drawnCards.length} cards`);
   } else {
     // End of opponent turn - discard all cards in hand and reset block
     const cardsToDiscard = [...newBattleState.opponentHand];
@@ -2099,7 +2100,7 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     
     log.push(...drawResult.minionDamageLog);
     
-    console.log(`Player drew ${drawResult.drawnCards.length} cards`);
+    dbg(`Player drew ${drawResult.drawnCards.length} cards`);
     
     // NOW update draw modifications AFTER the player has drawn their cards
     newBattleState.playerDrawModifications = updateDrawModifications(newBattleState.playerDrawModifications);
@@ -2111,11 +2112,11 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     newBattleState.battleLog = [...newBattleState.battleLog, ...log];
   }
 
-  console.log('=== END TURN DEBUG ===');
-  console.log('Final battle log length:', newBattleState.battleLog.length);
-  console.log('Final battle log:', newBattleState.battleLog);
-  console.log('New log entries added:', log);
-  console.log('=== END TURN DEBUG ===');
+  dbg('=== END TURN DEBUG ===');
+  dbg('Final battle log length:', newBattleState.battleLog.length);
+  dbg('Final battle log:', newBattleState.battleLog);
+  dbg('New log entries added:', log);
+  dbg('=== END TURN DEBUG ===');
 
   return { newBattleState, newPlayer, newOpponent };
 }

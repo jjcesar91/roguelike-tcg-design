@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { dbg } from '@/lib/debug';
 import { useGameState } from '@/hooks/useGameState';
 import { useSelectionState } from '@/hooks/useSelectionState';
 import { useSplashScreen } from '@/hooks/useSplashScreen';
@@ -64,12 +65,12 @@ export default function Game() {
 
   const handleClassSelect = (playerClass: PlayerClass) => {
     try {
-      console.log('🚀 handleClassSelect called with:', playerClass);
+      dbg('🚀 handleClassSelect called with:', playerClass);
       const { player, opponent, battleState } = GameEngine.startGame(playerClass);
-      console.log('📋 GameEngine.startGame result:', { player, opponent, battleState: { ...battleState, turn: battleState.turn } });
+      dbg('📋 GameEngine.startGame result:', { player, opponent, battleState: { ...battleState, turn: battleState.turn } });
       
       const newGameState = startGame(playerClass, opponent);
-      console.log('📋 useGameState.startGame result:', { 
+      dbg('📋 useGameState.startGame result:', { 
         gamePhase: newGameState.gamePhase, 
         player: newGameState.player, 
         opponent: newGameState.currentOpponent,
@@ -80,16 +81,16 @@ export default function Game() {
       
       // Show splash screen with scroll callback
       showBattleSplash(opponent, () => {
-        console.log('🎬 Splash screen callback triggered');
+        dbg('🎬 Splash screen callback triggered');
         // Scroll to top after splash screen completes
         window.scrollTo({ top: 0, behavior: 'smooth' });
         
         // Check if opponent has ambush and goes first
         setTimeout(() => {
-          console.log('⏰ Ambush check timeout triggered');
+          dbg('⏰ Ambush check timeout triggered');
           // Use the current game state from ref instead of captured battleState
           const currentState = gameStateRef.current;
-          console.log('📋 Current state in timeout:', { 
+          dbg('📋 Current state in timeout:', { 
             gamePhase: currentState.gamePhase, 
             player: currentState.player, 
             opponent: currentState.currentOpponent,
@@ -97,19 +98,19 @@ export default function Game() {
           });
           
           if (currentState.battleState && currentState.battleState.turn === 'opponent') {
-            console.log('Opponent has ambush - triggering first turn');
+            dbg('Opponent has ambush - triggering first turn');
             playOpponentTurn();
           } else {
-            console.log('No ambush detected or missing battle state');
+            dbg('No ambush detected or missing battle state');
           }
         }, 500); // Small delay after splash screen
       });
       
       // Force a re-render by logging immediately after
       setTimeout(() => {
-        console.log('📋 Game state after 100ms delay:', gameState);
-        console.log('Current game phase after update:', gameState.gamePhase);
-        console.log('Current opponent after update:', gameState.currentOpponent);
+        dbg('📋 Game state after 100ms delay:', gameState);
+        dbg('Current game phase after update:', gameState.gamePhase);
+        dbg('Current opponent after update:', gameState.currentOpponent);
       }, 100);
       
     } catch (error) {
@@ -176,21 +177,21 @@ export default function Game() {
 
   
   const handleCardPlay = (card: any) => {
-    console.log('=== GAME COMPONENT CARD PLAY DEBUG ===');
-    console.log('Card being played:', card);
-    console.log('Card name:', card.name);
-    console.log('Card ID:', card.id);
-    console.log('Card cost:', card.cost);
-    console.log('Current game state:', gameState);
+    dbg('=== GAME COMPONENT CARD PLAY DEBUG ===');
+    dbg('Card being played:', card);
+    dbg('Card name:', card.name);
+    dbg('Card ID:', card.id);
+    dbg('Card cost:', card.cost);
+    dbg('Current game state:', gameState);
     
     if (!gameState.player || !gameState.currentOpponent || !gameState.battleState) {
-      console.log('❌ Missing required game state for card play');
+      dbg('❌ Missing required game state for card play');
       return;
     }
 
-    console.log('✅ Game state valid, calling GameEngine.playCard...');
+    dbg('✅ Game state valid, calling GameEngine.playCard...');
     const result = GameEngine.playCard(card, gameState.player, gameState.currentOpponent, gameState.battleState);
-    console.log('GameEngine.playCard result:', result);
+    dbg('GameEngine.playCard result:', result);
     
     updatePlayer(result.newPlayer);
     updateOpponent(result.newOpponent);
@@ -198,17 +199,17 @@ export default function Game() {
 
     // Check for victory or defeat
     if (GameEngine.checkVictory(result.newPlayer, result.newOpponent)) {
-      console.log('🎉 Victory detected!');
+      dbg('🎉 Victory detected!');
       handleVictory();
     } else if (GameEngine.checkDefeat(result.newPlayer)) {
-      console.log('💀 Defeat detected!');
+      dbg('💀 Defeat detected!');
       handleDefeat();
     }
-    console.log('=== GAME COMPONENT CARD PLAY COMPLETE ===');
+    dbg('=== GAME COMPONENT CARD PLAY COMPLETE ===');
   };
 
   const handleEndTurn = () => {
-    console.log('handleEndTurn called');
+    dbg('handleEndTurn called');
     if (!gameState.battleState || !gameState.player || !gameState.currentOpponent) return;
 
     const { newBattleState, newPlayer, newOpponent, isOpponentTurn } = GameEngine.endTurn(
@@ -217,14 +218,14 @@ export default function Game() {
       gameState.currentOpponent
     );
     
-    console.log('After endTurn, new turn:', newBattleState.turn);
+    dbg('After endTurn, new turn:', newBattleState.turn);
     
     updateBattleState(newBattleState);
     updatePlayer(newPlayer);
     updateOpponent(newOpponent);
     
     if (isOpponentTurn) {
-      console.log('Setting up opponent turn...');
+      dbg('Setting up opponent turn...');
       // Use the unified opponent turn runner
       setTimeout(() => {
         playOpponentTurn();

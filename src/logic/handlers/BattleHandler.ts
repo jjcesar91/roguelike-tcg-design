@@ -1,3 +1,4 @@
+import { dbg } from '@/lib/debug';
 import { Card, Player, Opponent, BattleState } from '@/types/game';
 import { playCard, opponentPlayCard, endTurn, checkVictory, checkDefeat, canPlayCard as canPlayCardUtil } from '@/lib/gameUtils';
 
@@ -18,10 +19,10 @@ export class BattleHandler {
   }
 
   static handleEndTurn(battleState: BattleState, player: Player, opponent: Opponent) {
-    console.log('handleEndTurn called');
+    dbg('handleEndTurn called');
     
     const { newBattleState, newPlayer, newOpponent } = endTurn(battleState, player, opponent);
-    console.log('After endTurn, new turn:', newBattleState.turn);
+    dbg('After endTurn, new turn:', newBattleState.turn);
     
     return {
       newBattleState,
@@ -32,7 +33,7 @@ export class BattleHandler {
   }
 
   static handleOpponentTurn(opponent: Opponent, player: Player, battleState: BattleState) {
-    console.log('Starting opponent turn with sequential card playing...');
+    dbg('Starting opponent turn with sequential card playing...');
     
     // Return immediately with the initial state - the actual card playing will be handled sequentially
     return {
@@ -51,7 +52,7 @@ export class BattleHandler {
     battleState: BattleState, 
     cardIndex: number = 0
   ) {
-    console.log(`handleOpponentPlayCard called for card index ${cardIndex}`);
+    dbg(`handleOpponentPlayCard called for card index ${cardIndex}`);
     
     // Get the opponent's playable cards
     const playableCards = battleState.opponentHand.filter(card => {
@@ -60,7 +61,7 @@ export class BattleHandler {
 
     if (cardIndex >= playableCards.length) {
       // No more cards to play, end the turn
-      console.log('No more cards to play, ending opponent turn');
+      dbg('No more cards to play, ending opponent turn');
       const { newBattleState: finalBattleState, newPlayer: finalPlayer, newOpponent: finalOpponent } = endTurn(battleState, player, opponent);
       
       return {
@@ -74,7 +75,7 @@ export class BattleHandler {
     }
 
     const cardToPlay = playableCards[cardIndex];
-    console.log('Playing opponent card:', cardToPlay.name);
+    dbg('Playing opponent card:', cardToPlay.name);
 
     // Show card preview state
     const previewState = {
@@ -85,7 +86,7 @@ export class BattleHandler {
     // Actually play the card after a delay
     setTimeout(() => {
       // This will be handled by the component state management
-      console.log('Card preview finished, actually playing the card');
+      dbg('Card preview finished, actually playing the card');
     }, 1500);
 
     // For now, return the current state with the card preview
