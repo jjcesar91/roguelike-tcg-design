@@ -99,7 +99,7 @@ export default function Game() {
           
           if (currentState.battleState && currentState.battleState.turn === 'opponent') {
             console.log('Opponent has ambush - triggering first turn');
-            handleOpponentFirstTurn();
+            playOpponentTurn();
           } else {
             console.log('No ambush detected or missing battle state');
           }
@@ -118,38 +118,63 @@ export default function Game() {
     }
   };
 
-  const handleOpponentFirstTurn = () => {
-    console.log('handleOpponentFirstTurn called');
-    console.log('Current gameState:', gameState);
-    console.log('Current gameStateRef:', gameStateRef.current);
-    
-    // Always use the ref for state checking since it's more up-to-date
-    const currentState = gameStateRef.current;
-    if (!currentState.battleState || !currentState.player || !currentState.currentOpponent) {
-      console.log('Missing required state for opponent first turn');
-      console.log('currentState.battleState:', currentState.battleState);
-      console.log('currentState.player:', currentState.player);
-      console.log('currentState.currentOpponent:', currentState.currentOpponent);
-      return;
+  // Simplified, sequential opponent turn without nested setTimeout chains
+  const playOpponentTurn = async () => {
+    const current = gameStateRef.current;
+    if (!current.battleState || !current.player || !current.currentOpponent) return;
+
+    // Draw 3 for opponent at start of their first turn (ambush or regular)
+    const { drawCardsWithMinionEffects, formatLogText } = await import('@/lib/gameUtils');
+    const bs = { ...current.battleState };
+    const pl = { ...current.player };
+    const op = { ...current.currentOpponent };
+
+    const draw = drawCardsWithMinionEffects(
+      bs.opponentDeck,
+      bs.opponentDiscardPile,
+      3,
+      'opponent',
+      pl.class,
+      op.name
+    );
+    bs.opponentHand = [...bs.opponentHand, ...draw.drawnCards];
+    bs.opponentDeck = draw.updatedDeck;
+    bs.opponentDiscardPile = draw.updatedDiscardPile;
+    bs.battleLog = [...bs.battleLog, formatLogText('Opponent draws 3 cards...', pl.class, op.name), ...draw.minionDamageLog];
+
+    updateBattleState(bs);
+    updateOpponent(op);
+
+    // Play all playable cards in order with small UI delays
+    const playable = () => bs.opponentHand.filter(c => !c.unplayable && c.cost <= bs.opponentEnergy);
+    while (playable().length) {
+      const card = playable()[0];
+      updateOpponentCardPreview(card, true);
+      await new Promise(r => setTimeout(r, 800));
+      updateOpponentCardPreview(null, false);
+
+      const { opponentPlayCard } = await import('@/lib/gameUtils');
+      const res = opponentPlayCard(op, pl, bs, card);
+      const mergedLog = [...res.newBattleState.battleLog, ...res.log];
+      updatePlayer(res.newPlayer);
+      updateOpponent(res.newOpponent);
+      updateBattleState({ ...res.newBattleState, battleLog: mergedLog });
+
+      // Victory/defeat checks
+      if (GameEngine.checkVictory(res.newPlayer, res.newOpponent)) { handleVictory(); return; }
+      if (GameEngine.checkDefeat(res.newPlayer)) { handleDefeat(); return; }
+
+      // small pause between cards
+      await new Promise(r => setTimeout(r, 400));
     }
 
-    console.log('✅ All required state is present, proceeding with opponent ambush turn...');
-    console.log('Current turn:', currentState.battleState.turn);
-    console.log('Player health:', currentState.player.health);
-    console.log('Opponent health:', currentState.currentOpponent.health);
+    // End opponent turn when no cards playable
+    const end = GameEngine.endTurn(gameStateRef.current.battleState!, gameStateRef.current.player!, gameStateRef.current.currentOpponent!);
+    updateBattleState(end.newBattleState);
+    updatePlayer(end.newPlayer);
+    updateOpponent(end.newOpponent);
+  };
 
-    // First, simulate the start of opponent turn (draw cards, apply effects)
-    Promise.all([
-      import('@/lib/gameUtils')
-    ]).then(([gameUtils]) => {
-      const { 
-        drawCardsWithMinionEffects, 
-        applyBleedingDamage, 
-        updateStatusEffects,
-        formatLogText
-      } = gameUtils;
-      
-      let updatedBattleState = { ...currentState.battleState };
       let updatedPlayer = { ...currentState.player };
       let updatedOpponent = { ...currentState.currentOpponent };
       const log: string[] = [];

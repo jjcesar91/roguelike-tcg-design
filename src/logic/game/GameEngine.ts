@@ -3,6 +3,7 @@ import { ClassHandler } from '../handlers/ClassHandler';
 import { BattleHandler } from '../handlers/BattleHandler';
 import { SelectionHandler } from '../handlers/SelectionHandler';
 import { getRandomPassives, checkVictory, checkDefeat } from '@/lib/gameUtils';
+import { BattleEngine } from './BattleEngine';
 
 export class GameEngine {
   static startGame(playerClass: PlayerClass) {
@@ -48,5 +49,11 @@ export class GameEngine {
 
   static canPlayCard(card: Card, player: Player, battleState: BattleState) {
     return BattleHandler.canPlayCard(card, player, battleState);
+  }
+
+
+  // Non-breaking helper exposing the new OOP engine
+  static startBattleOOP(playerClass: PlayerClass, difficulty: 'basic' | 'medium' | 'boss' = 'basic') {
+    return BattleEngine.startBattle(playerClass, difficulty);
   }
 }
