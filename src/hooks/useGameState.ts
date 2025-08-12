@@ -9,7 +9,11 @@ export const useGameState = () => {
     gamePhase: 'starting-splash',
     availableCards: [],
     availablePassives: [],
-    battleState: null
+    battleState: null,
+    opponentCardPreview: {
+      card: null,
+      isVisible: false
+    }
   });
 
   const gameStateRef = useRef(gameState);
@@ -52,7 +56,11 @@ export const useGameState = () => {
       gamePhase: 'battle' as const,
       availableCards: [],
       availablePassives: [],
-      battleState: updatedBattleState
+      battleState: updatedBattleState,
+      opponentCardPreview: {
+        card: null,
+        isVisible: false
+      }
     };
 
     setGameState(newGameState);
@@ -77,6 +85,16 @@ export const useGameState = () => {
     setGameState(prev => ({
       ...prev,
       battleState
+    }));
+  };
+
+  const updateOpponentCardPreview = (card: any, isVisible: boolean) => {
+    setGameState(prev => ({
+      ...prev,
+      opponentCardPreview: {
+        card,
+        isVisible
+      }
     }));
   };
 
@@ -108,7 +126,11 @@ export const useGameState = () => {
       gamePhase: 'starting-splash',
       availableCards: [],
       availablePassives: [],
-      battleState: null
+      battleState: null,
+      opponentCardPreview: {
+        card: null,
+        isVisible: false
+      }
     });
   };
 
@@ -160,6 +182,7 @@ export const useGameState = () => {
     updatePlayer,
     updateOpponent,
     updateBattleState,
+    updateOpponentCardPreview,
     setGamePhase,
     setAvailableCards,
     setAvailablePassives,

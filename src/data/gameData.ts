@@ -283,7 +283,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
     {
       id: 'beast_pack_mentality',
       name: 'Call the Pack',
-      description: 'Shuffle 2 \'Wolf\' unplayable minion cards in the player deck with \'Deal 5 damage when drawn\'',
+      description: 'Add 2 \'Wolf\' unplayable minion cards to the player discard pile with \'Deal 5 damage when drawn\'',
       cost: 2,
       effect: 'Shuffle wolf minions',
       class: 'beast',

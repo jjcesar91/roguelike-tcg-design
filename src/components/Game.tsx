@@ -6,6 +6,7 @@ import { useSelectionState } from '@/hooks/useSelectionState';
 import { useSplashScreen } from '@/hooks/useSplashScreen';
 import { useModalState } from '@/hooks/useModalState';
 import { GameEngine } from '@/logic/game/GameEngine';
+import { playOpponentCard, opponentPlayCard } from '@/lib/gameUtils';
 import { ClassSelection } from './game/phases/ClassSelection';
 import { CardSelection } from './game/phases/CardSelection';
 import { PassiveSelection } from './game/phases/PassiveSelection';
@@ -14,6 +15,7 @@ import { DefeatScreen } from './game/phases/DefeatScreen';
 import { BattlePhase } from './game/battle/BattlePhase';
 import { SplashScreen } from './game/shared/SplashScreen';
 import { StartingSplashScreen } from './game/shared/StartingSplashScreen';
+import { OpponentCardPreview } from './game/battle/OpponentCardPreview';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PlayerClass } from '@/types/game';
 import { playerClasses } from '@/data/gameData';
@@ -26,6 +28,7 @@ export default function Game() {
     updatePlayer,
     updateOpponent,
     updateBattleState,
+    updateOpponentCardPreview,
     setGamePhase,
     setAvailableCards,
     setAvailablePassives,
@@ -49,6 +52,7 @@ export default function Game() {
   const {
     showSplashScreen,
     splashOpponent,
+    splashCompleted,
     showBattleSplash
   } = useSplashScreen();
 
@@ -141,8 +145,8 @@ export default function Game() {
       const { 
         drawCardsWithMinionEffects, 
         applyBleedingDamage, 
-        updateStatusEffects, 
-        formatLogText 
+        updateStatusEffects,
+        formatLogText
       } = gameUtils;
       
       let updatedBattleState = { ...currentState.battleState };
@@ -150,20 +154,8 @@ export default function Game() {
       let updatedOpponent = { ...currentState.currentOpponent };
       const log: string[] = [];
 
-      // Start of opponent turn - apply bleeding damage to opponent
-      const opponentBleedingResult = applyBleedingDamage(
-        updatedBattleState.opponentStatusEffects,
-        updatedOpponent.health,
-        updatedOpponent.name,
-        false,
-        updatedPlayer.class,
-        updatedOpponent.name
-      );
-      updatedOpponent.health = opponentBleedingResult.newHealth;
-      log.push(...opponentBleedingResult.logMessages);
-
-      // Start of opponent turn - draw 3 cards with proper reshuffle logic
-      console.log('About to draw 3 cards for opponent...');
+      // Start of opponent turn - draw 3 cards with proper reshuffle logic for ambush
+      console.log('Drawing 3 cards for opponent ambush turn...');
       console.log('Opponent deck before drawing:', updatedBattleState.opponentDeck);
       console.log('Opponent deck length:', updatedBattleState.opponentDeck.cards.length);
       
@@ -214,89 +206,10 @@ export default function Game() {
           const currentStateAfterDraw = gameStateRef.current;
           console.log('currentStateAfterDraw:', currentStateAfterDraw);
           if (currentStateAfterDraw.battleState && currentStateAfterDraw.player && currentStateAfterDraw.currentOpponent) {
-            console.log('Calling opponentTurn for ambush after drawing...');
-            console.log('Opponent hand before playing:', currentStateAfterDraw.battleState.opponentHand);
-            console.log('Opponent hand length:', currentStateAfterDraw.battleState.opponentHand.length);
-            console.log('Opponent hand details:', currentStateAfterDraw.battleState.opponentHand.map(c => ({ name: c.name, cost: c.cost, unplayable: c.unplayable })));
+            console.log('Starting sequential opponent turn for ambush after drawing...');
             
-            // Check if opponent has any playable cards
-            const playableCards = currentStateAfterDraw.battleState.opponentHand.filter(card => card.cost <= 2 && !card.unplayable);
-            console.log('Playable cards:', playableCards.map(c => c.name));
-            console.log('Playable cards count:', playableCards.length);
-            console.log('All cards in hand:', currentStateAfterDraw.battleState.opponentHand.map(c => ({ name: c.name, cost: c.cost, unplayable: c.unplayable })));
-            
-            if (playableCards.length === 0) {
-              console.log('❌ NO PLAYABLE CARDS - this is the issue!');
-              console.log('Opponent hand details:', currentStateAfterDraw.battleState.opponentHand);
-            } else {
-              console.log('✅ Found playable cards, proceeding with turn');
-            }
-            
-            // Use GameEngine.opponentTurn to handle the opponent's turn
-            console.log('About to call GameEngine.opponentTurn...');
-            try {
-              const result = GameEngine.opponentTurn(
-                currentStateAfterDraw.currentOpponent, 
-                currentStateAfterDraw.player, 
-                currentStateAfterDraw.battleState
-              );
-              console.log('✅ GameEngine opponentTurn completed successfully');
-              console.log('GameEngine opponentTurn result:', result);
-              console.log('Cards played by opponent:', result.newBattleState.opponentPlayedCards);
-              console.log('Battle log after opponent turn:', result.newBattleState.battleLog);
-              console.log('Turn after opponent turn:', result.newBattleState.turn);
-
-              console.log('Updating game state...');
-              updatePlayer(result.newPlayer);
-              updateOpponent(result.newOpponent);
-              updateBattleState(result.newBattleState);
-
-              // The opponentTurn function already handles ending the turn, so we just need to draw player cards
-              setTimeout(() => {
-                const updatedState = gameStateRef.current;
-                if (updatedState.battleState && updatedState.player) {
-                  console.log('Drawing player initial cards after ambush...');
-                  console.log('Current turn before drawing player cards:', updatedState.battleState.turn);
-                  const playerDrawResult = drawCardsWithMinionEffects(
-                    updatedState.battleState.playerDeck, 
-                    updatedState.battleState.playerDiscardPile, 
-                    3,
-                    'player',
-                    updatedState.player.class,
-                    updatedState.currentOpponent?.name || ''
-                  );
-                  
-                  const newBattleState = {
-                    ...updatedState.battleState,
-                    playerHand: playerDrawResult.drawnCards,
-                    playerDeck: playerDrawResult.updatedDeck,
-                    playerDiscardPile: playerDrawResult.updatedDiscardPile,
-                    battleLog: [
-                      ...updatedState.battleState.battleLog,
-                      formatLogText('Player draws 3 cards...', updatedState.player.class, updatedState.currentOpponent?.name || ''),
-                      ...playerDrawResult.minionDamageLog
-                    ]
-                  };
-                  
-                  updateBattleState(newBattleState);
-                  console.log('✅ Player cards drawn after ambush turn - turn should now be player\'s');
-                  console.log('Current turn after ambush:', newBattleState.turn);
-                  console.log('=== OPPONENT TURN COMPLETED ===');
-                }
-              }, 1000);
-
-              // Check for victory or defeat
-              if (result.isVictory) {
-                console.log('Victory detected!');
-                handleVictory();
-              } else if (result.isDefeat) {
-                console.log('Defeat detected!');
-                handleDefeat();
-              }
-            } catch (error) {
-              console.error('❌ ERROR in GameEngine.opponentTurn:', error);
-              console.error('Error details:', error);
-            }
+            // Start sequential opponent card playing
+            handleSequentialOpponentTurn(0);
           } else {
             console.log('❌ Missing required state for opponent turn');
             console.log('currentStateAfterDraw.battleState:', currentStateAfterDraw.battleState);
@@ -309,9 +222,21 @@ export default function Game() {
   };
 
   const handleCardPlay = (card: any) => {
-    if (!gameState.player || !gameState.currentOpponent || !gameState.battleState) return;
+    console.log('=== GAME COMPONENT CARD PLAY DEBUG ===');
+    console.log('Card being played:', card);
+    console.log('Card name:', card.name);
+    console.log('Card ID:', card.id);
+    console.log('Card cost:', card.cost);
+    console.log('Current game state:', gameState);
+    
+    if (!gameState.player || !gameState.currentOpponent || !gameState.battleState) {
+      console.log('❌ Missing required game state for card play');
+      return;
+    }
 
+    console.log('✅ Game state valid, calling GameEngine.playCard...');
     const result = GameEngine.playCard(card, gameState.player, gameState.currentOpponent, gameState.battleState);
+    console.log('GameEngine.playCard result:', result);
     
     updatePlayer(result.newPlayer);
     updateOpponent(result.newOpponent);
@@ -319,10 +244,13 @@ export default function Game() {
 
     // Check for victory or defeat
     if (GameEngine.checkVictory(result.newPlayer, result.newOpponent)) {
+      console.log('🎉 Victory detected!');
       handleVictory();
     } else if (GameEngine.checkDefeat(result.newPlayer)) {
+      console.log('💀 Defeat detected!');
       handleDefeat();
     }
+    console.log('=== GAME COMPONENT CARD PLAY COMPLETE ===');
   };
 
   const handleEndTurn = () => {
@@ -344,41 +272,92 @@ export default function Game() {
     if (isOpponentTurn) {
       console.log('Setting up opponent turn...');
       
-      // Then, after a short delay, have the opponent play their card
-      console.log('Setting timeout for opponent play...');
+      // Start sequential opponent card playing
       setTimeout(() => {
-        console.log('Timeout callback executed');
-        
-        const currentState = gameStateRef.current;
-        console.log('Current state from ref:', currentState);
-        if (!currentState.battleState || !currentState.player || !currentState.currentOpponent) {
-          console.log('Missing required state, returning');
-          return;
-        }
-
-        console.log('Calling opponentPlayCard...');
-        const result = GameEngine.opponentTurn(
-          currentState.currentOpponent, 
-          currentState.player, 
-          currentState.battleState
-        );
-        console.log('opponentPlayCard result:', result);
-
-        console.log('Updating game state...');
-        updatePlayer(result.newPlayer);
-        updateOpponent(result.newOpponent);
-        updateBattleState(result.newBattleState);
-
-        // Check for victory or defeat
-        if (result.isVictory) {
-          console.log('Victory detected!');
-          handleVictory();
-        } else if (result.isDefeat) {
-          console.log('Defeat detected!');
-          handleDefeat();
-        }
-      }, 1000); // 1 second delay for better UX
+        handleSequentialOpponentTurn(0);
+      }, 1000);
     }
+  };
+
+  const handleSequentialOpponentTurn = (cardIndex: number) => {
+    console.log(`handleSequentialOpponentTurn called for card index ${cardIndex}`);
+    
+    const currentState = gameStateRef.current;
+    if (!currentState.battleState || !currentState.player || !currentState.currentOpponent) {
+      console.log('Missing required state, returning');
+      return;
+    }
+
+    // Get playable cards for opponent
+    const playableCards = currentState.battleState!.opponentHand.filter(card => {
+      return !card.unplayable && card.cost <= currentState.battleState!.opponentEnergy;
+    });
+
+    console.log('Playable cards:', playableCards.map(c => c.name));
+    console.log('Card index:', cardIndex);
+
+    if (cardIndex >= playableCards.length) {
+      // No more cards to play, end the turn
+      console.log('No more cards to play, ending opponent turn');
+      const { newBattleState, newPlayer, newOpponent } = GameEngine.endTurn(
+        currentState.battleState, 
+        currentState.player, 
+        currentState.currentOpponent
+      );
+      
+      updateBattleState(newBattleState);
+      updatePlayer(newPlayer);
+      updateOpponent(newOpponent);
+
+      // Check for victory or defeat
+      if (GameEngine.checkVictory(newPlayer, newOpponent)) {
+        handleVictory();
+      } else if (GameEngine.checkDefeat(newPlayer)) {
+        handleDefeat();
+      }
+      return;
+    }
+
+    const cardToPlay = playableCards[cardIndex];
+    console.log('Playing opponent card:', cardToPlay.name);
+
+    // Show card preview
+    updateOpponentCardPreview(cardToPlay, true);
+
+    // After 1.5 seconds, hide the preview and actually play the card
+    setTimeout(() => {
+      console.log('Card preview finished, actually playing the card');
+      
+      // Hide the preview
+      updateOpponentCardPreview(null, false);
+
+      // Actually play the card
+      const result = opponentPlayCard(currentState.currentOpponent!, currentState.player!, currentState.battleState!, cardToPlay);
+      
+      // Update battle log
+      const updatedBattleState = {
+        ...result.newBattleState,
+        battleLog: [...result.newBattleState.battleLog, ...result.log]
+      };
+      
+      updatePlayer(result.newPlayer);
+      updateOpponent(result.newOpponent);
+      updateBattleState(updatedBattleState);
+
+      // Check for victory or defeat
+      if (GameEngine.checkVictory(result.newPlayer, result.newOpponent)) {
+        handleVictory();
+        return;
+      } else if (GameEngine.checkDefeat(result.newPlayer)) {
+        handleDefeat();
+        return;
+      }
+
+      // Continue with the next card after a short delay
+      setTimeout(() => {
+        handleSequentialOpponentTurn(cardIndex + 1);
+      }, 500);
+    }, 1500);
   };
 
   const handleCardSelect = (card: any) => {
@@ -436,7 +415,7 @@ export default function Game() {
 
   return (
     <TooltipProvider>
-      <div className="container mx-auto p-4 max-w-6xl">
+      <div className="container mx-auto p-4 max-w-[720px]">
         {/* Starting Splash Screen */}
         <StartingSplashScreen 
           isVisible={gameState.gamePhase === 'starting-splash'}
@@ -447,6 +426,13 @@ export default function Game() {
         <SplashScreen 
           showSplashScreen={showSplashScreen}
           splashOpponent={splashOpponent}
+        />
+        
+        {/* Opponent Card Preview */}
+        <OpponentCardPreview 
+          card={gameState.opponentCardPreview.card}
+          isVisible={gameState.opponentCardPreview.isVisible}
+          onHide={() => updateOpponentCardPreview(null, false)}
         />
         
         {/* Game Phases */}
@@ -469,6 +455,7 @@ export default function Game() {
             onCardPlay={handleCardPlay}
             onEndTurn={handleEndTurn}
             canPlayCard={canPlayCard}
+            splashCompleted={splashCompleted}
           />
         )}
         

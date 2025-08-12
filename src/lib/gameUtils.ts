@@ -140,6 +140,7 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
   return {
     playerHand,
     playerEnergy: player.maxEnergy,
+    opponentEnergy: 2, // Opponent always has 2 energy
     opponentHand,
     turn: firstTurn,
     playerPlayedCards: [],
@@ -313,8 +314,9 @@ export function shuffleCardsIntoDeck(deck: Deck, cardsToAdd: Card[]): Deck {
 }
 
 export function createWolfMinionCards(): Card[] {
+  console.log('=== CREATE WOLF MINION CARDS DEBUG ===');
   // Create 2 Wolf minion cards
-  return [
+  const wolfMinions = [
     {
       id: 'beast_wolf_minion_1',
       name: 'Wolf',
@@ -340,9 +342,17 @@ export function createWolfMinionCards(): Card[] {
       unplayable: true
     }
   ];
+  console.log('Created wolf minions:', wolfMinions);
+  console.log('=== CREATE WOLF MINION CARDS COMPLETE ===');
+  return wolfMinions;
 }
 
 export function formatCardDescription(description: string): string {
+  // Handle undefined or empty description
+  if (!description) {
+    return '';
+  }
+  
   // Remove "Unplayable minion. " prefix from minion card descriptions
   const minionPrefixMatch = description.match(/^Unplayable minion\. (.+)$/);
   if (minionPrefixMatch) {
@@ -779,6 +789,57 @@ export function playCard(
   const log: string[] = [];
   const cost = getCardCost(card, player);
   
+  // Special handling for Call the Pack - handle it immediately and directly
+  console.log('=== CALL THE PACK DEBUG ===');
+  console.log('Card being played:', card);
+  console.log('Card name:', card.name);
+  console.log('Card ID:', card.id);
+  console.log('Card name lowercase:', card.name?.toLowerCase());
+  console.log('Includes "call the pack":', card.name?.toLowerCase().includes('call the pack'));
+  console.log('ID check - call_pack:', card.id === 'call_pack');
+  console.log('ID check - beast_pack_mentality:', card.id === 'beast_pack_mentality');
+  
+  if ((card.name && card.name.toLowerCase().includes('call the pack')) || 
+      (card.id && (card.id === 'call_pack' || card.id === 'beast_pack_mentality'))) {
+    
+    console.log('✅ CALL THE PACK CARD DETECTED! Processing directly...');
+    
+    // Remove card from hand
+    const cardIndex = battleState.playerHand.findIndex(c => c.id === card.id);
+    console.log('Card index in hand:', cardIndex);
+    if (cardIndex !== -1) {
+      console.log('Removing card from hand at index:', cardIndex);
+      battleState.playerHand.splice(cardIndex, 1);
+    }
+    
+    // Add Wolf minions to player's discard pile
+    console.log('Creating Wolf minions...');
+    const wolfMinions = createWolfMinionCards();
+    console.log('Wolf minions created:', wolfMinions);
+    
+    const newBattleState = {
+      ...battleState,
+      playerHand: [...battleState.playerHand],
+      playerDiscardPile: [...battleState.playerDiscardPile, ...wolfMinions], // Only add Wolf minions for player's Call the Pack
+      playerEnergy: battleState.playerEnergy - cost,
+      playerPlayedCards: [...battleState.playerPlayedCards, card]
+    };
+    
+    console.log('New battle state discard pile:', newBattleState.playerDiscardPile);
+    console.log('Discard pile length:', newBattleState.playerDiscardPile.length);
+    
+    log.push(formatLogText(`Player added 2 Wolf to their discard pile`, player.class, opponent.name, card.name));
+    
+    console.log('=== CALL THE PACK PROCESSING COMPLETE ===');
+    return { 
+      newPlayer: player, 
+      newOpponent: opponent, 
+      newBattleState, 
+      log 
+    };
+  }
+  console.log('❌ CALL THE PACK CARD NOT DETECTED, continuing with normal processing...');
+  
   if (!canPlayCard(card, player, battleState.playerEnergy, battleState)) {
     return { newPlayer: player, newOpponent: opponent, newBattleState: battleState, log: [formatLogText('Not enough energy or card conditions not met!', player.class, opponent.name)] };
   }
@@ -929,18 +990,21 @@ export function playCard(
         newPlayer.health = Math.max(0, newPlayer.health - selfDamage);
         shouldLog = true;
         logMessage = `Player takes ${selfDamage} self damage from ${card.name}`;
-      } else if (card.effect.includes('shuffle') || card.effect.includes('summon') || card.effect.includes('minion')) {
-        // Deck manipulation or summoning effects - these are visible to player
+      } else if ((card.name && card.name.toLowerCase().includes('call the pack')) || (card.id && (card.id === 'call_pack' || card.id === 'beast_pack_mentality'))) {
+        console.log('🔄 FALLBACK CALL THE PACK HANDLING - This should NOT be reached if direct handling worked!');
+        console.log('Card being processed in fallback:', card);
+        // Special handling for Call the Pack - check by card name directly
         shouldLog = true;
-        // Special handling for Call the Pack
-        if (card.name === 'Call the Pack') {
-          // Create Wolf minion cards and shuffle them into opponent's deck
-          const wolfMinions = createWolfMinionCards();
-          newBattleState.opponentDeck = shuffleCardsIntoDeck(newBattleState.opponentDeck, wolfMinions);
-          logMessage = `Player shuffled 2 Wolf into ${opponent.name} deck`;
-        } else {
-          logMessage = `Player: ${card.name} - ${card.effect}`;
-        }
+        // Create Wolf minion cards and add them to player's discard pile
+        const wolfMinions = createWolfMinionCards();
+        console.log('Wolf minions created in fallback:', wolfMinions);
+        newBattleState.playerDiscardPile = [...newBattleState.playerDiscardPile, ...wolfMinions];
+        console.log('Updated discard pile in fallback:', newBattleState.playerDiscardPile);
+        logMessage = `Player added 2 Wolf to their discard pile (FALLBACK)`;
+      } else if (card.effect.includes('shuffle') || card.effect.includes('summon') || card.effect.includes('minion')) {
+        // Other deck manipulation or summoning effects
+        shouldLog = true;
+        logMessage = `Player: ${card.name} - ${card.effect}`;
       } else {
         // For other unknown effects, log them for debugging/visibility
         shouldLog = true;
@@ -956,21 +1020,145 @@ export function playCard(
   return { newPlayer, newOpponent, newBattleState, log };
 }
 
+// Helper function to play a single opponent card
+function playSingleOpponentCard(
+  cardToPlay: Card,
+  opponent: Opponent,
+  player: Player,
+  battleState: BattleState,
+  remainingEnergy: number,
+  log: string[]
+): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
+  console.log('🎮 Playing single opponent card:', cardToPlay.name);
+  
+  let newPlayer = { ...player };
+  let newOpponent = { ...opponent };
+  let newBattleState = { ...battleState };
+  
+  // Check if the card is Call the Pack
+  if ((cardToPlay.name && cardToPlay.name.toLowerCase().includes('call the pack')) || 
+      (cardToPlay.id && (cardToPlay.id === 'call_pack' || cardToPlay.id === 'beast_pack_mentality'))) {
+    console.log('✅ SINGLE CARD: CALL THE PACK DETECTED!');
+    
+    // Remove card from opponent hand
+    const cardIndex = newBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
+    if (cardIndex !== -1) {
+      newBattleState.opponentHand.splice(cardIndex, 1);
+    }
+    
+    // Add Wolf minions to player's discard pile
+    const wolfMinions = createWolfMinionCards();
+    newBattleState.playerDiscardPile = [...newBattleState.playerDiscardPile, ...wolfMinions];
+    newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, cardToPlay];
+    newBattleState.opponentEnergy = remainingEnergy - cardToPlay.cost;
+    newBattleState.opponentPlayedCards = [...newBattleState.opponentPlayedCards, cardToPlay];
+    
+    const playerClassName = player.class.charAt(0).toUpperCase() + player.class.slice(1);
+    log.push(formatLogText(`${opponent.name} added 2 Wolf to ${playerClassName} discard pile`, player.class, opponent.name, cardToPlay.name));
+    
+    return { newPlayer, newOpponent, newBattleState, log };
+  }
+  
+  // Normal card processing for non-Call the Pack cards
+  console.log('🎮 Processing normal card:', cardToPlay.name);
+  
+  // Remove the card from opponent's hand and add to discard pile
+  const cardIndex = newBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
+  if (cardIndex !== -1) {
+    const [removedCard] = newBattleState.opponentHand.splice(cardIndex, 1);
+    
+    // Check if card is volatile (burned when played - doesn't go to discard)
+    const isVolatile = removedCard.types && removedCard.types.includes(CardType.VOLATILE);
+    if (!isVolatile) {
+      newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, removedCard];
+    } else {
+      log.push(formatLogText(`${opponent.name}'s ${removedCard.name} was burned and removed from game!`, newPlayer.class, newOpponent.name, removedCard.name));
+    }
+  }
+  
+  // Deduct energy cost from opponent's energy
+  newBattleState.opponentEnergy -= cardToPlay.cost;
+  newBattleState.opponentPlayedCards.push(cardToPlay);
+  
+  // Apply card effects
+  if (cardToPlay.attack) {
+    let baseDamage = cardToPlay.attack;
+    
+    const damageResult = calculateDamageWithStatusEffects(
+      baseDamage, 
+      newBattleState.opponentStatusEffects, 
+      newBattleState.playerStatusEffects,
+      cardToPlay
+    );
+    
+    if (damageResult.evaded) {
+      const evasiveMessage = formatLogText(`${newPlayer.class}'s Evasive prevented damage from ${newOpponent.name}'s ${cardToPlay.name}`, newPlayer.class, newOpponent.name, cardToPlay.name);
+      log.push(evasiveMessage);
+    } else {
+      const totalDamage = damageResult.finalDamage;
+      
+      // Apply damage to player's block first, then health
+      if (newBattleState.playerBlock >= totalDamage) {
+        newBattleState.playerBlock -= totalDamage;
+        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} dealt ${totalDamage} damage to ${newPlayer.class}'s block`, newPlayer.class, newOpponent.name, cardToPlay.name));
+      } else {
+        const remainingDamage = totalDamage - newBattleState.playerBlock;
+        newPlayer.health = Math.max(0, newPlayer.health - remainingDamage);
+        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} broke ${newPlayer.class}'s block and dealt ${remainingDamage} damage`, newPlayer.class, newOpponent.name, cardToPlay.name));
+        newBattleState.playerBlock = 0;
+      }
+    }
+  }
+  
+  if (cardToPlay.defense) {
+    newBattleState.opponentBlock += cardToPlay.defense;
+    log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} gained ${cardToPlay.defense} block`, newPlayer.class, newOpponent.name, cardToPlay.name));
+  }
+  
+  // Apply card-specific effects
+  if (cardToPlay.effect) {
+    switch (cardToPlay.effect) {
+      case 'Apply 2 weak':
+        newBattleState.playerStatusEffects.push({
+          type: 'weak',
+          value: 2,
+          duration: 2
+        });
+        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 2 weak to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
+        break;
+      case 'Apply 1 vulnerable':
+        newBattleState.playerStatusEffects.push({
+          type: 'vulnerable',
+          value: 1,
+          duration: 3
+        });
+        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 1 vulnerable to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
+        break;
+      case 'Apply bleed 2':
+        newBattleState.playerStatusEffects.push({
+          type: 'bleeding',
+          value: 2,
+          duration: 1 // Bleeding doesn't use duration for stacking, but we'll set it
+        });
+        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 2 bleeding to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
+        break;
+      // Add more effects as needed
+    }
+  }
+  
+  console.log('✅ Single card play complete:', cardToPlay.name);
+  return { newPlayer, newOpponent, newBattleState, log };
+}
+
 export function opponentPlayCard(
   opponent: Opponent, 
   player: Player, 
-  battleState: BattleState
+  battleState: BattleState,
+  specificCard?: Card  // Optional parameter to play a specific card
 ): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
-  console.log('=== OPPONENT PLAY CARD START ===');
-  console.log('opponentPlayCard called');
-  console.log('Initial battle log length:', battleState.battleLog.length);
-  console.log('Initial battle log:', battleState.battleLog);
-  console.log('=== OPPONENT PLAY CARD START ===');
-  console.log('Opponent:', opponent);
-  console.log('Player:', player);
-  console.log('BattleState:', battleState);
-  console.log('Opponent hand:', battleState.opponentHand);
-  console.log('Opponent hand details:', battleState.opponentHand.map(c => ({ name: c.name, cost: c.cost, unplayable: c.unplayable, id: c.id })));
+  console.log('=== OPPONENT PLAY CARD FUNCTION CALLED ===');
+  console.log('This is the CORRECT function with Call the Pack handling!');
+  console.log('Specific card to play:', specificCard?.name);
   
   const log: string[] = [];
   let currentPlayer = { ...player };
@@ -978,7 +1166,51 @@ export function opponentPlayCard(
   let currentBattleState = { ...battleState };
   let remainingEnergy = 2; // Opponent has 2 energy
   
-  // Check if damage was prevented last turn (look for Evasive logs in battleLog)
+  // Get the opponent's playable cards
+  const playableCards = currentBattleState.opponentHand.filter(card => {
+    return !card.unplayable && card.cost <= remainingEnergy;
+  });
+  
+  // If a specific card is provided, use that one instead of prioritizing
+  let cardToPlay: Card | undefined;
+  
+  if (specificCard) {
+    // Verify the specific card is actually playable
+    cardToPlay = playableCards.find(card => card.id === specificCard.id);
+    console.log('Looking for specific card:', specificCard.name, 'Found:', cardToPlay?.name);
+  }
+  
+  // If no specific card or specific card not found, use prioritization logic
+  if (!cardToPlay) {
+    console.log('=== OPPONENT CALL THE PACK DEBUG ===');
+    console.log('Playable cards:', playableCards.map(c => ({ name: c.name, id: c.id })));
+    
+    cardToPlay = playableCards.find(card => {
+      console.log('Checking card:', card.name, card.id);
+      console.log('Name includes "call the pack":', card.name?.toLowerCase().includes('call the pack'));
+      console.log('ID matches call_pack:', card.id === 'call_pack');
+      console.log('ID matches beast_pack_mentality:', card.id === 'beast_pack_mentality');
+      return (card.name && card.name.toLowerCase().includes('call the pack')) || 
+             (card.id && (card.id === 'call_pack' || card.id === 'beast_pack_mentality'));
+    });
+    
+    console.log('Call the Pack card found:', cardToPlay);
+    
+    // If no Call the Pack card, just play the first playable card
+    if (!cardToPlay && playableCards.length > 0) {
+      cardToPlay = playableCards[0];
+      console.log('No Call the Pack found, playing first card:', cardToPlay.name);
+    }
+  }
+  
+  // If no card can be played, return current state
+  if (!cardToPlay) {
+    console.log('No card to play, returning current state');
+    return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
+  }
+  
+  // Since this is the AI combination mode (no specific card), play using combination logic
+  console.log('🤖 AI combination mode - playing optimal combinations...');
   const lastTurnDamagePrevented = currentBattleState.battleLog.some(logEntry => 
     logEntry.includes("'s Evasive prevented") && logEntry.includes("from")
   );
@@ -995,6 +1227,31 @@ export function opponentPlayCard(
     console.log(`[${index}]: "${log}" -> contains patterns: ${hasEvasive}`);
   });
   console.log('=== END BOOBY TRAP DEBUG ===');
+  
+  // If a specific card is provided, play just that card (respect the component's choice)
+  if (specificCard) {
+    console.log('🎯 Playing specific card as requested by component:', specificCard.name);
+    
+    // Verify the specific card is actually playable
+    const foundCard = playableCards.find(card => card.id === specificCard.id);
+    if (!foundCard) {
+      console.log('❌ Specific card not found in playable cards:', specificCard.name);
+      return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
+    }
+    
+    if (foundCard.cost > remainingEnergy) {
+      console.log('❌ Not enough energy for specific card:', foundCard.name, 'Cost:', foundCard.cost, 'Energy:', remainingEnergy);
+      return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
+    }
+    
+    console.log('✅ Playing specific card:', foundCard.name);
+    
+    // Play just this one card
+    return playSingleOpponentCard(foundCard, currentOpponent, currentPlayer, currentBattleState, remainingEnergy, log);
+  }
+  
+  // If no specific card, use AI combination logic for full turn
+  console.log('🤖 No specific card provided, using AI combination logic...');
   
   // Function to calculate combination score (prefers multiple cards)
   const calculateCombinationScore = (cards: Card[], totalCost: number): number => {
@@ -1048,6 +1305,14 @@ export function opponentPlayCard(
         priority += 2000; // Ultra high priority - almost mandatory
       }
       
+      // Killing Instinct - ultra high priority if target is bleeding
+      if (card.id === 'beast_hunters_instinct') {
+        const bleedingEffect = currentBattleState.playerStatusEffects.find(effect => effect.type === 'bleeding');
+        if (bleedingEffect && bleedingEffect.value > 0) {
+          priority += 2000; // Ultra high priority - almost mandatory
+        }
+      }
+      
       // Rogue Backstab - ultra high priority if it's the first card
       if (card.id === 'rogue_backstab' && currentBattleState.opponentPlayedCards.length === 0) {
         priority += 2000; // Ultra high priority when condition met
@@ -1064,9 +1329,19 @@ export function opponentPlayCard(
       }
     }
     
-    // 2: Volatile card - HIGH PRIORITY
+    // 2: Volatile card - HIGH PRIORITY (but conditional for Goblin Hunter)
     if (card.types && card.types.includes(CardType.VOLATILE)) {
-      priority += 800;
+      // For Cower cards, only prioritize if health is low
+      if (card.id === 'goblin_cower_volatile') {
+        const opponentHealthPercent = currentOpponent.health / currentOpponent.maxHealth;
+        if (opponentHealthPercent < 0.5) {
+          priority += 1000; // High priority when health is low
+        } else {
+          priority += 200; // Low priority when health is high
+        }
+      } else {
+        priority += 800; // Normal volatile priority for other cards
+      }
     }
     
     // 3: More card possible (cards that enable multi-card plays) - MEDIUM-HIGH PRIORITY
@@ -1093,6 +1368,18 @@ export function opponentPlayCard(
     // Special cards (rare) get high priority
     if (card.rarity === 'rare' || card.rarity === 'special') {
       priority += 50;
+    }
+    
+    // Goblin Hunter specific adjustments
+    if (card.id === 'goblin_cower') {
+      const opponentHealthPercent = currentOpponent.health / currentOpponent.maxHealth;
+      if (opponentHealthPercent < 0.3) {
+        priority += 600; // High priority when health is very low
+      } else if (opponentHealthPercent < 0.5) {
+        priority += 300; // Medium priority when health is low
+      } else {
+        priority += 100; // Low priority when health is high
+      }
     }
     
     // Lower cost cards get slight priority (for playing more cards)
@@ -1294,6 +1581,22 @@ export function opponentPlayCard(
             );
             shouldLog = true;
             logMessage = `${opponent.name} gained 1 Evasive from ${cardToPlay.name}`;
+          } else if (cardToPlay.effect === 'If last turn prevented damage from an attack, deal 10 damage') {
+            // Booby Trap effect - check if damage was prevented last turn
+            const lastTurnDamagePrevented = currentBattleState.battleLog.some(logEntry => 
+              logEntry.includes("'s Evasive prevented") && logEntry.includes("from")
+            );
+            
+            if (lastTurnDamagePrevented) {
+              // Deal 10 damage
+              currentPlayer.health = Math.max(0, currentPlayer.health - 10);
+              shouldLog = true;
+              logMessage = `${opponent.name}'s Booby Trap deals 10 damage! (Damage was prevented last turn)`;
+            } else {
+              // No damage dealt, but card still played
+              shouldLog = true;
+              logMessage = `${opponent.name}'s Booby Trap failed! (No damage prevented last turn)`;
+            }
           } else if (cardToPlay.effect === 'Next turn player draw one card less') {
             // Dirty Trick effect - add draw modification
             currentBattleState.playerDrawModifications = addDrawModification(
@@ -1309,9 +1612,10 @@ export function opponentPlayCard(
             shouldLog = true;
             if (cardToPlay.name === 'Call the Pack') {
               const wolfMinions = createWolfMinionCards();
-              currentBattleState.playerDeck = shuffleCardsIntoDeck(currentBattleState.playerDeck, wolfMinions);
+              // Add to player's discard pile, not deck
+              currentBattleState.playerDiscardPile = [...currentBattleState.playerDiscardPile, ...wolfMinions];
               const playerClassName = player.class.charAt(0).toUpperCase() + player.class.slice(1);
-              logMessage = `${opponent.name} shuffled 2 Wolf into ${playerClassName} deck`;
+              logMessage = `${opponent.name} added 2 Wolf to ${playerClassName} discard pile`;
             } else {
               logMessage = `${opponent.name}: ${cardToPlay.name} - ${cardToPlay.effect}`;
             }
@@ -1332,8 +1636,108 @@ export function opponentPlayCard(
     log.push(formatLogText('Opponent skips turn', player.class, opponent.name));
   }
   
-  console.log('Opponent play result:', { currentPlayer, currentOpponent, currentBattleState, log });
   return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
+}
+
+export function playOpponentCard(
+  opponent: Opponent, 
+  player: Player, 
+  battleState: BattleState,
+  cardToPlay: Card
+): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
+  console.log('=== PLAY OPPONENT CARD START ===');
+  console.log('playOpponentCard called');
+  console.log('Card to play:', cardToPlay.name);
+  
+  const log: string[] = [];
+  let newPlayer = { ...player };
+  let newOpponent = { ...opponent };
+  let newBattleState = { ...battleState };
+  
+  // Remove the card from opponent's hand and add to discard pile
+  const cardIndex = newBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
+  if (cardIndex !== -1) {
+    const [removedCard] = newBattleState.opponentHand.splice(cardIndex, 1);
+    
+    // Check if card is volatile (burned when played - doesn't go to discard)
+    const isVolatile = removedCard.types && removedCard.types.includes(CardType.VOLATILE);
+    if (!isVolatile) {
+      newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, removedCard];
+    } else {
+      log.push(formatLogText(`${opponent.name}'s ${removedCard.name} was burned and removed from game!`, newPlayer.class, newOpponent.name, removedCard.name));
+    }
+  }
+  
+  // Deduct energy cost from opponent's energy
+  newBattleState.opponentEnergy -= cardToPlay.cost;
+  newBattleState.opponentPlayedCards.push(cardToPlay);
+  
+  // Apply card effects
+  if (cardToPlay.attack) {
+    let baseDamage = cardToPlay.attack;
+    
+    const damageResult = calculateDamageWithStatusEffects(
+      baseDamage, 
+      newBattleState.opponentStatusEffects, 
+      newBattleState.playerStatusEffects,
+      cardToPlay
+    );
+    
+    if (damageResult.evaded) {
+      const evasiveMessage = formatLogText(`${newPlayer.class}'s Evasive prevented damage from ${newOpponent.name}'s ${cardToPlay.name}`, newPlayer.class, newOpponent.name, cardToPlay.name);
+      log.push(evasiveMessage);
+    } else {
+      const totalDamage = damageResult.finalDamage;
+      
+      // Apply damage to player's block first, then health
+      if (newBattleState.playerBlock >= totalDamage) {
+        newBattleState.playerBlock -= totalDamage;
+        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} dealt ${totalDamage} damage to ${newPlayer.class}'s block`, newPlayer.class, newOpponent.name, cardToPlay.name));
+      } else {
+        const remainingDamage = totalDamage - newBattleState.playerBlock;
+        newPlayer.health = Math.max(0, newPlayer.health - remainingDamage);
+        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} broke ${newPlayer.class}'s block and dealt ${remainingDamage} damage`, newPlayer.class, newOpponent.name, cardToPlay.name));
+        newBattleState.playerBlock = 0;
+      }
+    }
+  }
+  
+  if (cardToPlay.defense) {
+    newBattleState.opponentBlock += cardToPlay.defense;
+    log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} gained ${cardToPlay.defense} block`, newPlayer.class, newOpponent.name, cardToPlay.name));
+  }
+  
+  // Apply card-specific effects
+  if (cardToPlay.effect) {
+    switch (cardToPlay.effect) {
+      case 'Apply 2 weak':
+        newBattleState.playerStatusEffects.push({
+          type: 'weak',
+          value: 2,
+          duration: 2
+        });
+        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 2 weak to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
+        break;
+      case 'Apply 1 vulnerable':
+        newBattleState.playerStatusEffects.push({
+          type: 'vulnerable',
+          value: 1,
+          duration: 3
+        });
+        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 1 vulnerable to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
+        break;
+      // Add more effects as needed
+    }
+  }
+  
+  console.log('=== PLAY OPPONENT CARD END ===');
+  console.log('Final player health:', newPlayer.health);
+  console.log('Final opponent health:', newOpponent.health);
+  console.log('Final player block:', newBattleState.playerBlock);
+  console.log('Final opponent block:', newBattleState.opponentBlock);
+  console.log('Battle log entries:', log);
+  
+  return { newPlayer, newOpponent, newBattleState, log };
 }
 
 export function drawCardsWithMinionEffects(
@@ -1515,6 +1919,9 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     newBattleState.playerPlayedCards = [];
     
     newBattleState.turn = 'opponent';
+    
+    // Reset opponent energy at start of their turn
+    newBattleState.opponentEnergy = 2;
     
     // Start of opponent turn - trigger start of turn effects
     const startOfTurnLog = triggerStartOfTurnEffects(newOpponent, newBattleState, 'opponent');

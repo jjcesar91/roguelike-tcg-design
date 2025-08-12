@@ -33,7 +33,7 @@ export const StartingSplashScreen: React.FC<StartingSplashScreenProps> = ({
   if (!isVisible) return null;
 
   return (
-    <div className={`fixed inset-0 bg-black flex items-center justify-center z-50 transition-opacity duration-500 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
+    <div className={`fixed inset-0 bg-black flex items-center justify-center z-[60] transition-opacity duration-500 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
       <div className="w-full h-full flex items-center justify-center p-4 md:p-8 lg:p-12">
         <img 
           src="https://i.imgur.com/qESwpq9.png" 

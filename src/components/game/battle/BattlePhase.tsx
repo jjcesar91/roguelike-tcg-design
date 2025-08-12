@@ -1,9 +1,8 @@
 import React from 'react';
 import { Player, Opponent, BattleState, Card } from '@/types/game';
 import { BattleHeader } from './BattleHeader';
-import { TurnIndicator } from './TurnIndicator';
 import { BattleLog } from './BattleLog';
-import { PlayerHand } from './PlayerHand';
+import { PlayerHUD } from './PlayerHUD';
 
 interface BattlePhaseProps {
   player: Player;
@@ -16,6 +15,7 @@ interface BattlePhaseProps {
   onCardPlay: (card: Card) => void;
   onEndTurn: () => void;
   canPlayCard: (card: Card) => boolean;
+  splashCompleted: boolean;
 }
 
 export const BattlePhase: React.FC<BattlePhaseProps> = ({
@@ -28,10 +28,25 @@ export const BattlePhase: React.FC<BattlePhaseProps> = ({
   onDiscardModalChange,
   onCardPlay,
   onEndTurn,
-  canPlayCard
+  canPlayCard,
+  splashCompleted
 }) => {
   return (
     <div className="space-y-6">
+      {/* Player HUD - Fixed Position */}
+      <PlayerHUD 
+        player={player}
+        battleState={battleState}
+        showDeckModal={showDeckModal}
+        showDiscardModal={showDiscardModal}
+        onDeckModalChange={onDeckModalChange}
+        onDiscardModalChange={onDiscardModalChange}
+        onCardPlay={onCardPlay}
+        onEndTurn={onEndTurn}
+        canPlayCard={canPlayCard}
+        splashCompleted={splashCompleted}
+      />
+      
       {/* Battle Header */}
       <BattleHeader 
         player={player}
@@ -39,27 +54,8 @@ export const BattlePhase: React.FC<BattlePhaseProps> = ({
         battleState={battleState}
       />
       
-      {/* Turn Indicator */}
-      <TurnIndicator 
-        battleState={battleState}
-        opponentName={opponent.name}
-        showDeckModal={showDeckModal}
-        showDiscardModal={showDiscardModal}
-        onDeckModalChange={onDeckModalChange}
-        onDiscardModalChange={onDiscardModalChange}
-        onEndTurn={onEndTurn}
-      />
-      
       {/* Battle Log */}
       <BattleLog battleState={battleState} />
-      
-      {/* Player Hand */}
-      <PlayerHand 
-        player={player}
-        battleState={battleState}
-        onCardPlay={onCardPlay}
-        canPlayCard={canPlayCard}
-      />
     </div>
   );
 };

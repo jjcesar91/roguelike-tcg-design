@@ -2,11 +2,17 @@ import React, { useState } from 'react';
 import { Hand, Swords, Star, Crown, Skull, User, CircleDotDashed } from 'lucide-react';
 import { CardType } from '@/types/game';
 import { CardTypeModal } from '@/components/game/modals/CardTypeModal';
+import { Badge } from '@/components/ui/badge';
 
 interface CardTypesProps {
   types: CardType[] | undefined;
   className?: string;
   onModalOpenChange?: (isOpen: boolean) => void;
+}
+
+interface CardTypeBadgeProps {
+  type: CardType;
+  className?: string;
 }
 
 export const CardTypes: React.FC<CardTypesProps> = ({ types, className, onModalOpenChange }) => {
@@ -92,5 +98,35 @@ export const CardTypes: React.FC<CardTypesProps> = ({ types, className, onModalO
         />
       )}
     </>
+  );
+};
+
+export const CardTypeBadge: React.FC<CardTypeBadgeProps> = ({ type, className }) => {
+  const getBadgeColor = (type: CardType) => {
+    const typeStr = String(type).toLowerCase();
+    switch (typeStr) {
+      case 'melee':
+        return 'bg-red-500';
+      case 'attack':
+        return 'bg-orange-500';
+      case 'skill':
+        return 'bg-green-500';
+      case 'power':
+        return 'bg-purple-500';
+      case 'curse':
+        return 'bg-gray-500';
+      case 'minion':
+        return 'bg-yellow-500';
+      case 'volatile':
+        return 'bg-pink-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+  
+  return (
+    <Badge className={`${getBadgeColor(type)} text-white text-xs ${className || ''}`}>
+      {type.charAt(0).toUpperCase() + type.slice(1)}
+    </Badge>
   );
 };

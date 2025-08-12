@@ -81,6 +81,10 @@ export interface GameState {
   availableCards: Card[];
   availablePassives: Passive[];
   battleState: BattleState | null;
+  opponentCardPreview: {
+    card: Card | null;
+    isVisible: boolean;
+  };
 }
 
 export interface StatusEffect {
@@ -99,6 +103,7 @@ export interface DrawModification {
 export interface BattleState {
   playerHand: Card[];
   playerEnergy: number;
+  opponentEnergy: number;
   opponentHand: Card[];
   turn: 'player' | 'opponent';
   playerPlayedCards: Card[];
