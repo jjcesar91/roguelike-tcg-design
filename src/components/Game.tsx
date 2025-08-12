@@ -6,7 +6,6 @@ import { useSelectionState } from '@/hooks/useSelectionState';
 import { useSplashScreen } from '@/hooks/useSplashScreen';
 import { useModalState } from '@/hooks/useModalState';
 import { GameEngine } from '@/logic/game/GameEngine';
-import { playOpponentCard, opponentPlayCard } from '@/lib/gameUtils';
 import { ClassSelection } from './game/phases/ClassSelection';
 import { CardSelection } from './game/phases/CardSelection';
 import { PassiveSelection } from './game/phases/PassiveSelection';
@@ -175,77 +174,7 @@ export default function Game() {
     updateOpponent(end.newOpponent);
   };
 
-      let updatedPlayer = { ...currentState.player };
-      let updatedOpponent = { ...currentState.currentOpponent };
-      const log: string[] = [];
-
-      // Start of opponent turn - draw 3 cards with proper reshuffle logic for ambush
-      console.log('Drawing 3 cards for opponent ambush turn...');
-      console.log('Opponent deck before drawing:', updatedBattleState.opponentDeck);
-      console.log('Opponent deck length:', updatedBattleState.opponentDeck.cards.length);
-      
-      const drawResult = drawCardsWithMinionEffects(
-        updatedBattleState.opponentDeck, 
-        updatedBattleState.opponentDiscardPile, 
-        3,
-        'opponent',
-        updatedPlayer.class,
-        updatedOpponent.name
-      );
-      
-      console.log('Draw result:', drawResult);
-      console.log('Cards drawn:', drawResult.drawnCards);
-      console.log('Drawn card names:', drawResult.drawnCards.map(c => c.name));
-      console.log('Drawn card costs:', drawResult.drawnCards.map(c => c.cost));
-      console.log('Drawn card unplayable:', drawResult.drawnCards.map(c => c.unplayable));
-      
-      updatedBattleState.opponentHand = [...updatedBattleState.opponentHand, ...drawResult.drawnCards];
-      updatedBattleState.opponentDeck = drawResult.updatedDeck;
-      updatedBattleState.opponentDiscardPile = drawResult.updatedDiscardPile;
-      
-      log.push(formatLogText('Opponent draws 3 cards...', updatedPlayer.class, updatedOpponent.name));
-      
-      // Apply damage from Wolf minions if any
-      if (drawResult.minionDamageLog.length > 0) {
-        // Calculate total damage from Wolf minions
-        const wolfDamage = drawResult.minionDamageLog.length * 5; // Each Wolf deals 5 damage
-        updatedOpponent.health = Math.max(0, updatedOpponent.health - wolfDamage);
-      }
-      
-      log.push(...drawResult.minionDamageLog);
-      
-      console.log(`Opponent drew ${drawResult.drawnCards.length} cards for ambush turn`);
-
-      // Update the state with the drawn cards
-      updateBattleState(updatedBattleState);
-      updateOpponent(updatedOpponent);
-
-      // Add a small delay to ensure state updates are processed
-      setTimeout(() => {
-        console.log('=== STATE UPDATE COMPLETED ===');
-        console.log('Updated gameStateRef:', gameStateRef.current);
-        
-        // Now play the opponent's turn
-        setTimeout(() => {
-          console.log('=== STARTING OPPONENT TURN ===');
-          const currentStateAfterDraw = gameStateRef.current;
-          console.log('currentStateAfterDraw:', currentStateAfterDraw);
-          if (currentStateAfterDraw.battleState && currentStateAfterDraw.player && currentStateAfterDraw.currentOpponent) {
-            console.log('Starting sequential opponent turn for ambush after drawing...');
-            
-            // Start sequential opponent card playing
-            handleSequentialOpponentTurn(0);
-          } else {
-            console.log('❌ Missing required state for opponent turn');
-            console.log('currentStateAfterDraw.battleState:', currentStateAfterDraw.battleState);
-            console.log('currentStateAfterDraw.player:', currentStateAfterDraw.player);
-            console.log('currentStateAfterDraw.currentOpponent:', currentStateAfterDraw.currentOpponent);
-          }
-        }, 500); // Small delay to show the drawing happened
-      }, 100); // Small delay to ensure state updates are processed
-    });
-  };
-
+  
   const handleCardPlay = (card: any) => {
     console.log('=== GAME COMPONENT CARD PLAY DEBUG ===');
     console.log('Card being played:', card);
@@ -296,94 +225,13 @@ export default function Game() {
     
     if (isOpponentTurn) {
       console.log('Setting up opponent turn...');
-      
-      // Start sequential opponent card playing
+      // Use the unified opponent turn runner
       setTimeout(() => {
-        handleSequentialOpponentTurn(0);
-      }, 1000);
+        playOpponentTurn();
+      }, 300);
     }
   };
 
-  const handleSequentialOpponentTurn = (cardIndex: number) => {
-    console.log(`handleSequentialOpponentTurn called for card index ${cardIndex}`);
-    
-    const currentState = gameStateRef.current;
-    if (!currentState.battleState || !currentState.player || !currentState.currentOpponent) {
-      console.log('Missing required state, returning');
-      return;
-    }
-
-    // Get playable cards for opponent
-    const playableCards = currentState.battleState!.opponentHand.filter(card => {
-      return !card.unplayable && card.cost <= currentState.battleState!.opponentEnergy;
-    });
-
-    console.log('Playable cards:', playableCards.map(c => c.name));
-    console.log('Card index:', cardIndex);
-
-    if (cardIndex >= playableCards.length) {
-      // No more cards to play, end the turn
-      console.log('No more cards to play, ending opponent turn');
-      const { newBattleState, newPlayer, newOpponent } = GameEngine.endTurn(
-        currentState.battleState, 
-        currentState.player, 
-        currentState.currentOpponent
-      );
-      
-      updateBattleState(newBattleState);
-      updatePlayer(newPlayer);
-      updateOpponent(newOpponent);
-
-      // Check for victory or defeat
-      if (GameEngine.checkVictory(newPlayer, newOpponent)) {
-        handleVictory();
-      } else if (GameEngine.checkDefeat(newPlayer)) {
-        handleDefeat();
-      }
-      return;
-    }
-
-    const cardToPlay = playableCards[cardIndex];
-    console.log('Playing opponent card:', cardToPlay.name);
-
-    // Show card preview
-    updateOpponentCardPreview(cardToPlay, true);
-
-    // After 1.5 seconds, hide the preview and actually play the card
-    setTimeout(() => {
-      console.log('Card preview finished, actually playing the card');
-      
-      // Hide the preview
-      updateOpponentCardPreview(null, false);
-
-      // Actually play the card
-      const result = opponentPlayCard(currentState.currentOpponent!, currentState.player!, currentState.battleState!, cardToPlay);
-      
-      // Update battle log
-      const updatedBattleState = {
-        ...result.newBattleState,
-        battleLog: [...result.newBattleState.battleLog, ...result.log]
-      };
-      
-      updatePlayer(result.newPlayer);
-      updateOpponent(result.newOpponent);
-      updateBattleState(updatedBattleState);
-
-      // Check for victory or defeat
-      if (GameEngine.checkVictory(result.newPlayer, result.newOpponent)) {
-        handleVictory();
-        return;
-      } else if (GameEngine.checkDefeat(result.newPlayer)) {
-        handleDefeat();
-        return;
-      }
-
-      // Continue with the next card after a short delay
-      setTimeout(() => {
-        handleSequentialOpponentTurn(cardIndex + 1);
-      }, 500);
-    }, 1500);
-  };
 
   const handleCardSelect = (card: any) => {
     if (!gameState.player || !selectedReplaceCard) return;
