@@ -4,6 +4,7 @@ export enum CardType {
   SKILL = 'skill',
   POWER = 'power',
   CURSE = 'curse',
+  RANGED = 'ranged',
   MINION = 'minion',
   VOLATILE = 'volatile'
 }

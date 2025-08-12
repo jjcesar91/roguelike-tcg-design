@@ -1,4 +1,4 @@
-import { Card, Passive, Opponent, PlayerClass, OpponentType, CardType } from '@/types/game';
+import { Card, Passive, Opponent, PlayerClass, OpponentType, CardType, OpponentPassive } from '@/types/game';
 import { extraCards, extraOpponents, extraPassives, extraClasses } from '@/content';
 import { Swords, Skull, Zap, VenetianMask } from 'lucide-react';
 
