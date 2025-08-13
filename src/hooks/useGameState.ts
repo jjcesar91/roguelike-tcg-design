@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { GameState, PlayerClass, Player, Opponent, BattleState } from '@/types/game';
 import { createPlayer, getRandomOpponent, initializeBattle, getRandomCards, getRandomPassives, replaceCardInDeck, drawCardsWithReshuffle } from '@/lib/gameUtils';
+import { getLevelConfig } from '@/logic/game/progression';
 
 export const useGameState = () => {
   const [gameState, setGameState] = useState<GameState>({
@@ -135,37 +136,22 @@ export const useGameState = () => {
   };
 
   const handleVictory = () => {
-    if (!gameState.player) return;
-
-    const currentLevel = gameState.player.level;
-    const newLevel = gameState.player.level + 1;
-    let nextPhase: GameState['gamePhase'] = 'card-selection';
-    let availablePassives: any[] = [];
-
-    // After beating medium opponent (when current level is 2), offer passive selection
-    if (currentLevel === 2) {
-      nextPhase = 'passive-selection';
-      availablePassives = getRandomPassives(gameState.player.class, 3);
-    }
-
-    // After beating boss (level 3), game is complete
-    if (newLevel > 3) {
-      setGameState(prev => ({
-        ...prev,
-        gamePhase: 'victory'
-      }));
+    const levelCfg = getLevelConfig(gameStateRef.current.player?.level ?? 1);
+    if (!levelCfg) {
+      setGamePhase('victory');
       return;
     }
-
-    const availableCards = getRandomCards(gameState.player.class, 3);
-
-    setGameState(prev => ({
-      ...prev,
-      player: { ...prev.player!, level: newLevel },
-      gamePhase: nextPhase,
-      availableCards,
-      availablePassives
-    }));
+    if (levelCfg.reward === 'card') {
+      setGamePhase('card-selection');
+      const newCards = getRandomCards(gameStateRef.current.player?.class || 'warrior', 3);
+      setAvailableCards(newCards);
+    } else if (levelCfg.reward === 'passive') {
+      setGamePhase('passive-selection');
+      const passives = getRandomPassives(gameStateRef.current.player?.class || 'warrior', 3);
+      setAvailablePassives(passives);
+    } else {
+      setGamePhase('victory');
+    }
   };
 
   const handleDefeat = () => {
