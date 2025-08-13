@@ -1,7 +1,6 @@
 import { dbg } from '@/lib/debug';
 import { Card, Player } from '@/types/game';
 import { replaceCardInDeck, getRandomOpponent, initializeBattle, drawCardsWithReshuffle, getRandomCards } from '@/lib/gameUtils';
-import { getLevelConfig } from '@/logic/game/progression';
 
 export class SelectionHandler {
   static handleCardSelect(card: Card, player: Player, replaceCardId: string) {
@@ -19,7 +18,7 @@ export class SelectionHandler {
     
     dbg(`Player level: ${player.level}, selecting opponent difficulty: ${difficulty}`);
     
-    const opponent = getRandomOpponent(getLevelConfig(updatedPlayer.level)?.difficulty || 'basic');
+    const opponent = getRandomOpponent(difficulty);
     const battleState = initializeBattle(newPlayer, opponent);
     
     // Draw 3 cards for player's first turn using proper draw mechanics
