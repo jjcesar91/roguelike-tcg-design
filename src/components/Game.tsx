@@ -149,16 +149,27 @@ export default function Game() {
     const playable = () => bs.opponentHand.filter(c => !c.unplayable && c.cost <= bs.opponentEnergy);
     while (playable().length) {
       const card = playable()[0];
-      updateOpponentCardPreview(card, true);
-      await new Promise(r => setTimeout(r, 800));
-      updateOpponentCardPreview(null, false);
+      // Ask logic to resolve the card, then preview only if it truly played
+const { opponentPlayCard } = await import('@/lib/gameUtils');
+const snapshot = { energy: bs.opponentEnergy, hand: bs.opponentHand.length };
+const res = opponentPlayCard(op, pl, bs, card);
 
-      const { opponentPlayCard } = await import('@/lib/gameUtils');
-      const res = opponentPlayCard(op, pl, bs, card);
-      const mergedLog = [...res.newBattleState.battleLog, ...res.log];
-      updatePlayer(res.newPlayer);
-      updateOpponent(res.newOpponent);
-      updateBattleState({ ...res.newBattleState, battleLog: mergedLog });
+// Determine if a card was actually played (energy spent or hand reduced)
+const played =
+  res.newBattleState.opponentEnergy < snapshot.energy ||
+  res.newBattleState.opponentHand.length < snapshot.hand;
+
+if (played) {
+  updateOpponentCardPreview(card, true);
+  await new Promise(r => setTimeout(r, 600));
+  updateOpponentCardPreview(null, false);
+}
+
+const mergedLog = [...res.newBattleState.battleLog, ...res.log];
+updatePlayer(res.newPlayer);
+updateOpponent(res.newOpponent);
+updateBattleState({ ...res.newBattleState, battleLog: mergedLog });
+
 
       // Victory/defeat checks
       if (GameEngine.checkVictory(res.newPlayer, res.newOpponent)) { handleVictory(); return; }
