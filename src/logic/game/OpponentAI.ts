@@ -34,7 +34,6 @@ export class OpponentAI {
   protected enablingConditions: Record<string, (state: BattleState, opponent: Opponent, player: Player) => boolean> = {
     // Goblin Booby Trap: can only be played if last turn damage was prevented by Evasive
     'goblin_booby_trap': (state: BattleState) => {
-      // Look for log entries like "'s Evasive prevented" and "from" in the battle log
       return state.battleLog.some(entry => entry.includes("'s Evasive prevented") && entry.includes('from'));
     }
   };
@@ -49,20 +48,15 @@ export class OpponentAI {
     'beast_hunters_instinct': (state: BattleState) => {
       return state.playerStatusEffects.some(effect => effect.type === 'bleeding' && effect.value > 0);
     },
-    // Rogue Backstab: highest priority if this is the first card played by the opponent
+    // Rogue Backstab: highest priority if this is the first card played by the opponent this turn
     'rogue_backstab': (state: BattleState) => {
       return state.opponentPlayedCards.length === 0;
     },
-    // Wizard Arcane Power: prioritise if opponent has spell cards in hand
+    // Wizard Arcane Power: prioritise if opponent has spell cards in hand (by effect containing 'spell')
     'wizard_arcane_power': (state: BattleState, opponent: Opponent) => {
       return state.opponentHand.some(c => {
-        // Spell cards are represented by having an effect string containing 'spell'
         const hasSpellEffect = c.effect?.toLowerCase().includes('spell');
-        // Identify wizard attack or spell cards by using CardType constants
-        const isWizardAttack = c.class === 'wizard' && (
-          (c.types && c.types.includes(CardType.ATTACK)) || hasSpellEffect
-        );
-        return isWizardAttack;
+        return hasSpellEffect;
       });
     }
   };

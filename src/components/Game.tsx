@@ -18,8 +18,8 @@ import { StartingSplashScreen } from './game/shared/StartingSplashScreen';
 import { OpponentCardPreview } from './game/battle/OpponentCardPreview';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PlayerClass } from '@/types/game';
-import { playerClasses } from '@/data/gameData';
 import { OpponentAI } from '@/logic/game/OpponentAI';
+import { playerClasses } from '@/data/gameData';
 
 export default function Game() {
   const {
@@ -126,12 +126,11 @@ export default function Game() {
 
     // Draw 3 for opponent at start of their first turn (ambush or regular)
     const { drawCardsWithMinionEffects, formatLogText, opponentPlayCard } = await import('@/lib/gameUtils');
-    // Clone state to mutate locally without affecting refs mid‑turn
+    // Make local copies of battle state, player and opponent to mutate through the turn
     let bs = { ...current.battleState };
     let pl = { ...current.player };
     let op = { ...current.currentOpponent };
 
-    // Draw 3 cards for opponent
     const draw = drawCardsWithMinionEffects(
       bs.opponentDeck,
       bs.opponentDiscardPile,
@@ -143,67 +142,56 @@ export default function Game() {
     bs.opponentHand = [...bs.opponentHand, ...draw.drawnCards];
     bs.opponentDeck = draw.updatedDeck;
     bs.opponentDiscardPile = draw.updatedDiscardPile;
-    bs.battleLog = [
-      ...bs.battleLog,
-      formatLogText('Opponent draws 3 cards...', pl.class, op.name),
-      ...draw.minionDamageLog
-    ];
-
-    // Push updates to state for UI immediately after drawing
+    bs.battleLog = [...bs.battleLog, formatLogText('Opponent draws 3 cards...', pl.class, op.name), ...draw.minionDamageLog];
+    // Update state after drawing cards
     updateBattleState(bs);
     updateOpponent(op);
 
-    // Instantiate the unified AI for this opponent
+    // Instantiate unified opponent AI
     const ai = new OpponentAI();
-    // Loop until no cards can be played
+
+    // Loop until no playable cards
     while (true) {
-      // Determine which cards to play given current hand and energy
+      // Determine next set of cards to play based on current state
       const plays = ai.decidePlays(bs.opponentHand, bs.opponentEnergy, bs, op, pl);
-      if (plays.length === 0) break;
-      // Play cards sequentially
-      for (const card of plays) {
-        // Show card preview
-        updateOpponentCardPreview(card, true);
-        await new Promise(res => setTimeout(res, 800));
-        updateOpponentCardPreview(null, false);
-
-        // Play the specific card using gameUtils (card effects and energy deduction)
-        const result = opponentPlayCard(op, pl, bs, card);
-        // Merge logs
-        const mergedLog = [...result.newBattleState.battleLog, ...result.log];
-        // Update local state objects
-        bs = { ...result.newBattleState, battleLog: mergedLog };
-        pl = result.newPlayer;
-        op = result.newOpponent;
-        // Update React state
-        updatePlayer(pl);
-        updateOpponent(op);
-        updateBattleState(bs);
-
-        // Check for victory/defeat after each card
-        if (GameEngine.checkVictory(pl, op)) {
-          handleVictory();
-          return;
-        }
-        if (GameEngine.checkDefeat(pl)) {
-          handleDefeat();
-          return;
-        }
-
-        // Short pause before next card
-        await new Promise(res => setTimeout(res, 400));
+      if (!plays || plays.length === 0) {
+        break;
       }
-      // After playing planned cards, loop again in case new cards became playable due to effects/cost changes
-    }
+      // Always play cards one by one, recomputing after each play
+      const card = plays[0];
+      // Show preview for the chosen card
+      updateOpponentCardPreview(card, true);
+      await new Promise(r => setTimeout(r, 800));
+      updateOpponentCardPreview(null, false);
+      // Play the specific card
+      const res = opponentPlayCard(op, pl, bs, card);
+      // Merge logs: append our AI log entries
+      const mergedLog = [...res.newBattleState.battleLog, ...res.log];
+      bs = { ...res.newBattleState, battleLog: mergedLog };
+      pl = res.newPlayer;
+      op = res.newOpponent;
+      // Update React state
+      updateBattleState(bs);
+      updatePlayer(pl);
+      updateOpponent(op);
 
-    // End opponent turn when no cards are playable
+      // Check for victory or defeat
+      if (GameEngine.checkVictory(pl, op)) {
+        handleVictory();
+        return;
+      }
+      if (GameEngine.checkDefeat(pl)) {
+        handleDefeat();
+        return;
+      }
+      // small pause between cards
+      await new Promise(r => setTimeout(r, 400));
+    }
+    // End opponent turn when no cards are left to play
     const end = GameEngine.endTurn(bs, pl, op);
-    bs = end.newBattleState;
-    pl = end.newPlayer;
-    op = end.newOpponent;
-    updateBattleState(bs);
-    updatePlayer(pl);
-    updateOpponent(op);
+    updateBattleState(end.newBattleState);
+    updatePlayer(end.newPlayer);
+    updateOpponent(end.newOpponent);
   };
 
   
