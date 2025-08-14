@@ -1,5 +1,5 @@
 import { dbg } from '@/lib/debug';
-import { Card, Player, Opponent, BattleState, PlayerClass, GameState, Deck, CardType, DrawModification } from '@/types/game';
+import { BattleState, Card, CardType, Deck, DrawModification, GameState, Opponent, Player, PlayerClass, StatusType } from '@/types/game';
 import * as gameData from '@/data/gameData';
 
 dbg('gameUtils.ts loaded');
@@ -189,7 +189,7 @@ export function calculateDamageWithStatusEffects(damage: number, attackerStatusE
   let consumeEvasive = false;
   
   // Apply Evasive effect (prevents next damage from Melee/Attack cards)
-  const evasiveEffect = defenderStatusEffects.find(effect => effect.type === 'evasive');
+  const evasiveEffect = defenderStatusEffects.find(effect => effect.type === StatusType.EVASIVE);
   if (evasiveEffect && evasiveEffect.value > 0 && card && (card.types?.includes('melee') || card.types?.includes('attack'))) {
     // Evasive prevents all damage from this attack and consumes 1 stack
     evaded = true;
@@ -199,25 +199,25 @@ export function calculateDamageWithStatusEffects(damage: number, attackerStatusE
   
   if (!evaded) {
     // Apply Weak effect (reduces damage by 50% if present, does not stack, only for Attack cards)
-    const weakEffect = attackerStatusEffects.find(effect => effect.type === 'weak');
+    const weakEffect = attackerStatusEffects.find(effect => effect.type === StatusType.WEAK);
     if (weakEffect && card && card.types && card.types.includes('attack')) {
       finalDamage = Math.floor(finalDamage * 0.5);
     }
     
     // Apply Vulnerable effect (increases damage taken by 50% if present)
-    const vulnerableEffect = defenderStatusEffects.find(effect => effect.type === 'vulnerable');
+    const vulnerableEffect = defenderStatusEffects.find(effect => effect.type === StatusType.VULNERABLE);
     if (vulnerableEffect) {
       finalDamage = Math.floor(finalDamage * 1.5);
     }
     
     // Apply Strength effect (increases damage dealt by 3 per stack)
-    const strengthEffect = attackerStatusEffects.find(effect => effect.type === 'strength');
+    const strengthEffect = attackerStatusEffects.find(effect => effect.type === StatusType.STRENGTH);
     if (strengthEffect) {
       finalDamage += strengthEffect.value * 3;
     }
     
     // Apply Bleeding effect (reduces damage dealt by 1 per stack for attack cards)
-    const bleedingEffect = attackerStatusEffects.find(effect => effect.type === 'bleeding');
+    const bleedingEffect = attackerStatusEffects.find(effect => effect.type === StatusType.BLEEDING);
     if (bleedingEffect) {
       finalDamage = Math.max(0, finalDamage - bleedingEffect.value);
     }
@@ -265,14 +265,14 @@ export function updateStatusEffects(effects: any[]): any[] {
   return effects
     .map(effect => {
       // Bleeding doesn't decrease over time and has max stack of 5
-      if (effect.type === 'bleeding') {
+      if (effect.type === StatusType.BLEEDING) {
         return {
           ...effect,
           value: Math.min(5, effect.value) // Cap bleeding at 5 stacks
         };
       }
       // Evasive doesn't decrease over time and has max stack of 3
-      if (effect.type === 'evasive') {
+      if (effect.type === StatusType.EVASIVE) {
         return {
           ...effect,
           value: Math.min(3, effect.value) // Cap evasive at 3 stacks
@@ -284,11 +284,11 @@ export function updateStatusEffects(effects: any[]): any[] {
         duration: effect.duration - 1
       };
     })
-    .filter(effect => effect.type === 'bleeding' || effect.type === 'evasive' || effect.duration > 0);
+    .filter(effect => effect.type === StatusType.BLEEDING || effect.type === StatusType.EVASIVE || effect.duration > 0);
 }
 
 export function consumeEvasiveStack(targetEffects: any[]): any[] {
-  const evasiveEffect = targetEffects.find(effect => effect.type === 'evasive');
+  const evasiveEffect = targetEffects.find(effect => effect.type === StatusType.EVASIVE);
   
   if (evasiveEffect && evasiveEffect.value > 0) {
     // Decrease the Evasive stack by 1
@@ -481,7 +481,7 @@ export function calculateKillingInstinctDamage(card: Card, player: Player, battl
   let damage = card.attack || 0;
   
   // Check if target is bleeding and apply bonus damage
-  const bleedingEffect = battleState.opponentStatusEffects.find(effect => effect.type === 'bleeding');
+  const bleedingEffect = battleState.opponentStatusEffects.find(effect => effect.type === StatusType.BLEEDING);
   if (bleedingEffect && bleedingEffect.value > 0) {
     damage = 15; // Deal 15 damage instead of base 10 if target is bleeding
   }
@@ -555,7 +555,7 @@ export function triggerStartOfTurnEffects(character: Player | Opponent, battleSt
   
   // Clear Evasive stacks at the start of the turn
   const targetEffects = turnOwner === 'player' ? battleState.playerStatusEffects : battleState.opponentStatusEffects;
-  const evasiveEffect = targetEffects.find(effect => effect.type === 'evasive');
+  const evasiveEffect = targetEffects.find(effect => effect.type === StatusType.EVASIVE);
   
   if (evasiveEffect && evasiveEffect.value > 0) {
     const evasiveCount = evasiveEffect.value;
@@ -614,7 +614,7 @@ export function calculateModifiedDrawCount(baseDrawCount: number, modifications:
   let modifiedCount = baseDrawCount;
   
   // Process 'set' modifications first (they override base value)
-  const setModifications = modifications.filter(mod => mod.type === 'set');
+  const setModifications = modifications.filter(mod => mod.type === StatusType.SET);
   if (setModifications.length > 0) {
     // Use the most recent set modification (last in array)
     modifiedCount = setModifications[setModifications.length - 1].value;
@@ -622,14 +622,14 @@ export function calculateModifiedDrawCount(baseDrawCount: number, modifications:
   
   // Then process 'add' modifications
   modifications
-    .filter(mod => mod.type === 'add')
+    .filter(mod => mod.type === StatusType.ADD)
     .forEach(mod => {
       modifiedCount += mod.value;
     });
   
   // Finally process 'subtract' modifications
   modifications
-    .filter(mod => mod.type === 'subtract')
+    .filter(mod => mod.type === StatusType.SUBTRACT)
     .forEach(mod => {
       modifiedCount = Math.max(0, modifiedCount - mod.value); // Don't go below 0
     });
@@ -1308,7 +1308,7 @@ export function opponentPlayCard(
       
       // Killing Instinct - ultra high priority if target is bleeding
       if (card.id === 'beast_hunters_instinct') {
-        const bleedingEffect = currentBattleState.playerStatusEffects.find(effect => effect.type === 'bleeding');
+        const bleedingEffect = currentBattleState.playerStatusEffects.find(effect => effect.type === StatusType.BLEEDING);
         if (bleedingEffect && bleedingEffect.value > 0) {
           priority += 2000; // Ultra high priority - almost mandatory
         }
@@ -1476,7 +1476,7 @@ export function opponentPlayCard(
       if (cardToPlay.attack) {
         let baseDamage;
         if (cardToPlay.effect === 'Bonus damage vs bleeding') {
-          const bleedingEffect = currentBattleState.playerStatusEffects.find(effect => effect.type === 'bleeding');
+          const bleedingEffect = currentBattleState.playerStatusEffects.find(effect => effect.type === StatusType.BLEEDING);
           if (bleedingEffect && bleedingEffect.value > 0) {
             baseDamage = 15;
           } else {
@@ -1863,7 +1863,7 @@ export function applyBleedingDamage(
   const logMessages: string[] = [];
   let newHealth = targetHealth;
   
-  const bleedingEffect = targetEffects.find(effect => effect.type === 'bleeding');
+  const bleedingEffect = targetEffects.find(effect => effect.type === StatusType.BLEEDING);
   if (bleedingEffect && bleedingEffect.value > 0) {
     const damage = bleedingEffect.value;
     newHealth = Math.max(0, targetHealth - damage);

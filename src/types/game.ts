@@ -9,6 +9,18 @@ export enum CardType {
   VOLATILE = 'volatile'
 }
 
+export enum StatusType {
+  ADD = 'add',
+  BLEEDING = 'bleeding',
+  DEXTERITY = 'dexterity',
+  EVASIVE = 'evasive',
+  SET = 'set',
+  STRENGTH = 'strength',
+  SUBTRACT = 'subtract',
+  VULNERABLE = 'vulnerable',
+  WEAK = 'weak',
+}
+
 export interface Card {
   id: string;
   name: string;

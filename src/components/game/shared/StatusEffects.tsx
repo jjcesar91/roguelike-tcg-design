@@ -63,13 +63,13 @@ export const StatusEffects: React.FC<StatusEffectsProps> = ({
               className={`text-xs font-medium ${getStatusBadgeStyle(effect.type)}`}
               onClick={() => handleBadgeClick(effect)}
             >
-              {effect.type === 'weak' && <TrendingDown className="w-3 h-3 mr-1" />}
-              {effect.type === 'vulnerable' && <AlertTriangle className="w-3 h-3 mr-1" />}
-              {effect.type === 'strength' && <TrendingUp className="w-3 h-3 mr-1" />}
-              {effect.type === 'dexterity' && <Target className="w-3 h-3 mr-1" />}
-              {effect.type === 'bleeding' && <Droplets className="w-3 h-3 mr-1" />}
-              {effect.type === 'evasive' && <Shield className="w-3 h-3 mr-1" />}
-              {effect.type} {effect.type === 'bleeding' ? effect.value : effect.type === 'evasive' ? effect.value : `(${getStatusDisplayDuration(effect.type, effect.duration)})`}
+              {effect.type === StatusType.WEAK && <TrendingDown className="w-3 h-3 mr-1" />}
+              {effect.type === StatusType.VULNERABLE && <AlertTriangle className="w-3 h-3 mr-1" />}
+              {effect.type === StatusType.STRENGTH && <TrendingUp className="w-3 h-3 mr-1" />}
+              {effect.type === StatusType.DEXTERITY && <Target className="w-3 h-3 mr-1" />}
+              {effect.type === StatusType.BLEEDING && <Droplets className="w-3 h-3 mr-1" />}
+              {effect.type === StatusType.EVASIVE && <Shield className="w-3 h-3 mr-1" />}
+              {effect.type} {effect.type === StatusType.BLEEDING ? effect.value : effect.type === StatusType.EVASIVE ? effect.value : `(${getStatusDisplayDuration(effect.type, effect.duration)})`}
             </Badge>
           ))}
         </div>
