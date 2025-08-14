@@ -7,6 +7,8 @@ export enum CardType {
   RANGED = 'ranged',
   MINION = 'minion',
   VOLATILE = 'volatile'
+  DEFENSE = 'defense',
+  SPELL = 'spell',
 }
 
 export enum StatusType {
@@ -151,7 +153,7 @@ export interface PlayerClassData {
 }
 
 export interface Intent {
-  type: 'attack' | 'block' | 'buff' | 'debuff';
+  type: CardType.ATTACK | 'block' | 'buff' | 'debuff';
   value: number;
   description: string;
 }

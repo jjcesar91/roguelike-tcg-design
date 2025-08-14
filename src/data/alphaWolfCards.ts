@@ -1,4 +1,4 @@
-import { Card } from '@/types/game';
+import { Card, CardType } from '@/types/game';
 
 export const alphaWolfCards: Card[] = [
   {
@@ -9,7 +9,7 @@ export const alphaWolfCards: Card[] = [
     attack: 7,
     class: 'beast',
     rarity: 'common',
-    types: ['melee', 'attack']
+    types: [CardType.MELEE, CardType.ATTACK]
   },
   {
     id: 'vicious_bite',
@@ -20,7 +20,7 @@ export const alphaWolfCards: Card[] = [
     effect: 'Apply bleed 2',
     class: 'beast',
     rarity: 'common',
-    types: ['melee', 'attack']
+    types: [CardType.MELEE, CardType.ATTACK]
   },
   {
     id: 'terrifying_howl',
@@ -30,7 +30,7 @@ export const alphaWolfCards: Card[] = [
     effect: 'Apply 2 weak',
     class: 'beast',
     rarity: 'rare',
-    types: ['skill']
+    types: [CardType.SKILL]
   },
   {
     id: 'call_pack',
@@ -40,7 +40,7 @@ export const alphaWolfCards: Card[] = [
     effect: 'Shuffle wolf minions',
     class: 'beast',
     rarity: 'rare',
-    types: ['skill']
+    types: [CardType.SKILL]
   },
   {
     id: 'killing_instinct',
@@ -51,6 +51,6 @@ export const alphaWolfCards: Card[] = [
     effect: 'Bonus damage vs bleeding',
     class: 'beast',
     rarity: 'common',
-    types: ['melee', 'attack']
+    types: [CardType.MELEE, CardType.ATTACK]
   }
 ];

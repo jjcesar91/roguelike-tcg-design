@@ -190,7 +190,7 @@ export function calculateDamageWithStatusEffects(damage: number, attackerStatusE
   
   // Apply Evasive effect (prevents next damage from Melee/Attack cards)
   const evasiveEffect = defenderStatusEffects.find(effect => effect.type === StatusType.EVASIVE);
-  if (evasiveEffect && evasiveEffect.value > 0 && card && (card.types?.includes('melee') || card.types?.includes('attack'))) {
+  if (evasiveEffect && evasiveEffect.value > 0 && card && (card.types?.includes(CardType.MELEE) || card.types?.includes(CardType.ATTACK))) {
     // Evasive prevents all damage from this attack and consumes 1 stack
     evaded = true;
     finalDamage = 0;
@@ -200,7 +200,7 @@ export function calculateDamageWithStatusEffects(damage: number, attackerStatusE
   if (!evaded) {
     // Apply Weak effect (reduces damage by 50% if present, does not stack, only for Attack cards)
     const weakEffect = attackerStatusEffects.find(effect => effect.type === StatusType.WEAK);
-    if (weakEffect && card && card.types && card.types.includes('attack')) {
+    if (weakEffect && card && card.types && card.types.includes(CardType.ATTACK)) {
       finalDamage = Math.floor(finalDamage * 0.5);
     }
     
@@ -940,7 +940,7 @@ export function playCard(
     const formattedParsedEffect = parseFormattedCardEffect(card.effect);
     if (parsedEffect && formattedParsedEffect) {
       // Check if card is an attack type and damage was completely blocked
-      const isAttackCard = card.types && card.types.includes('attack');
+      const isAttackCard = card.types && card.types.includes(CardType.ATTACK);
       if (isAttackCard && wasDamageBlocked) {
         log.push(formatLogText(`${card.name}'s effect was blocked! No ${parsedEffect.type} applied.`, player.class, opponent.name, card.name));
       } else {
@@ -1322,7 +1322,7 @@ export function opponentPlayCard(
       // Wizard Arcane Power - high priority if player has spell cards
       if (card.id === 'wizard_arcane_power') {
         const hasSpellCards = currentBattleState.opponentHand.some(c => 
-          c.class === 'wizard' && c.types && (c.types.includes('attack') || c.effect?.includes('spell'))
+          c.class === 'wizard' && c.types && (c.types.includes(CardType.ATTACK) || c.effect?.includes('spell'))
         );
         if (hasSpellCards) {
           priority += 1500; // Very high priority when useful
@@ -1351,17 +1351,17 @@ export function opponentPlayCard(
     }
     
     // 4: Non attack cards - MEDIUM PRIORITY
-    if (card.types && !card.types.includes('attack')) {
+    if (card.types && !card.types.includes(CardType.ATTACK)) {
       priority += 400;
     }
     
     // 5: Attack card with effect - MEDIUM-LOW PRIORITY
-    if (card.types && card.types.includes('attack') && card.effect && card.effect !== '') {
+    if (card.types && card.types.includes(CardType.ATTACK) && card.effect && card.effect !== '') {
       priority += 200;
     }
     
     // 6: Simple damage attack card - LOWEST PRIORITY
-    if (card.types && card.types.includes('attack') && (!card.effect || card.effect === '')) {
+    if (card.types && card.types.includes(CardType.ATTACK) && (!card.effect || card.effect === '')) {
       priority += 0; // Base priority, no bonus
     }
     
@@ -1529,7 +1529,7 @@ export function opponentPlayCard(
         const parsedEffect = parseCardEffect(cardToPlay.effect);
         const formattedParsedEffect = parseFormattedCardEffect(cardToPlay.effect);
         if (parsedEffect && formattedParsedEffect) {
-          const isAttackCard = cardToPlay.types && cardToPlay.types.includes('attack');
+          const isAttackCard = cardToPlay.types && cardToPlay.types.includes(CardType.ATTACK);
           if (isAttackCard && wasDamageBlocked) {
             log.push(formatLogText(`${opponent.name}'s ${cardToPlay.name} effect was blocked! No ${parsedEffect.type} applied.`, player.class, opponent.name, cardToPlay.name));
           } else {
