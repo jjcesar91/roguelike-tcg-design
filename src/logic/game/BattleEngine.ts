@@ -44,11 +44,11 @@ export class BattleEngine {
       energy: 2,
       deckCards: oppDeck,
       name: baseOpp.name,
-      passives: baseOpp.passive ? [baseOpp.passive as any] : []
+      passives: baseOpp.passives ? [baseOpp.passives as any] : []
     })
 
     // Determine first turn (simple ambush check by passive id/effect)
-    const ambush = baseOpp.passive && baseOpp.passive.effect === 'opponent_goes_first'
+    const ambush = Array.isArray(baseOpp.passives) && baseOpp.passives.some(p => p.effect === 'opponent_goes_first')
     const engine = new BattleEngine(player, opponent, ambush ? 'opponent' : 'player')
 
     if (engine.turn === 'player') {

@@ -1,6 +1,7 @@
 import { dbg } from '@/lib/debug';
-import { BattleState, Card, CardType, Deck, DrawModification, GameState, Opponent, Player, PlayerClass, StatusType } from '@/types/game';
+import { BattleState, Card, CardType, Deck, DrawModification, Rarity, GameState, Turn, Opponent, Player, PlayerClass, OpponentType, StatusType, DrawModType, Difficulty, EffectInstance, EffectCode, StatusEffect } from '@/types/game';
 import * as gameData from '@/data/gameData';
+import { runCardEffects } from '@/content/modules/effects';
 
 dbg('gameUtils.ts loaded');
 dbg('gameData import:', gameData);
@@ -58,7 +59,7 @@ export function createPlayer(playerClass: PlayerClass): Player {
   };
 }
 
-export function getRandomOpponent(difficulty: 'basic' | 'medium' | 'boss'): Opponent {
+export function getRandomOpponent(difficulty: Difficulty): Opponent {
   dbg('Getting random opponent for difficulty:', difficulty);
   dbg('Available opponents:', opponents);
   const availableOpponents = opponents.filter(opp => opp.difficulty === difficulty);
@@ -85,8 +86,8 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
   dbg('Opponent:', opponent);
   dbg('Opponent deck:', opponent.deck);
   dbg('Opponent deck cards:', opponent.deck?.cards);
-  dbg('Opponent passive:', opponent.passive);
-  
+  dbg('Opponent passives:', opponent.passives);
+
   // Create copies of decks for battle
   const playerDeckCopy = {
     cards: [...player.deck.cards],
@@ -96,53 +97,39 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
     cards: [...opponent.deck.cards],
     discardPile: [...opponent.deck.discardPile]
   };
-  
+
   dbg('Player deck copy:', playerDeckCopy);
   dbg('Opponent deck copy:', opponentDeckCopy);
   dbg('Opponent deck copy cards length:', opponentDeckCopy.cards.length);
   dbg('Opponent deck copy cards:', opponentDeckCopy.cards);
-  
+
   // Check if opponent has ambush passive
-  const hasAmbush = opponent.passive && opponent.passive.effect === 'opponent_goes_first';
+  const hasAmbush = Array.isArray(opponent.passives) && opponent.passives.some(p => p.effect === 'opponent_goes_first');
   dbg('Opponent has ambush:', hasAmbush);
-  
+
   // Determine who goes first
-  const firstTurn = hasAmbush ? 'opponent' : 'player';
+  const firstTurn = hasAmbush ? Turn.OPPONENT : Turn.PLAYER;
   dbg('First turn:', firstTurn);
-  
-  // Draw initial hands
-  const playerHand: Card[] = [];
-  let opponentHand: Card[] = [];
-  let opponentDrawResult: any = { drawnCards: [], minionDamageLog: [] };
-  
-  if (hasAmbush) {
-    // For ambush, opponent starts with empty hand and will draw during their turn
-    opponentHand = [];
-  } else {
-    // Normal case: opponent draws initial 3 cards
-    opponentDrawResult = drawCardsWithMinionEffects(opponentDeckCopy, [], 3, 'opponent', player.class, opponent.name);
-    opponentHand = opponentDrawResult.drawnCards;
-  }
-  
+
+  // --- NEW LOGIC: Create battleLog and provisional state before any draws ---
   // Create battle log with appropriate message based on who goes first
   const battleLog: string[] = [
-    formatLogText('Battle started!', player.class, opponent.name), 
+    formatLogText('Battle started!', player.class, opponent.name),
     formatLogText(`${player.class} vs ${opponent.name}`, player.class, opponent.name)
   ];
-  
+
   if (hasAmbush) {
     battleLog.push(formatLogText(`${opponent.name} uses Ambush and strikes first!`, player.class, opponent.name));
   } else {
     battleLog.push(formatLogText('Player draws 3 cards...', player.class, opponent.name));
-    // Add minion damage log if any (for normal case)
-    battleLog.push(...opponentDrawResult.minionDamageLog);
   }
-  
-  return {
-    playerHand,
+
+  // Provisional battle state so beforeDraw can add cards (e.g., Coward) before any draws
+  const provisionalState: BattleState = {
+    playerHand: [],
     playerEnergy: player.maxEnergy,
-    opponentEnergy: 2, // Opponent always has 2 energy
-    opponentHand,
+    opponentEnergy: 2,
+    opponentHand: [],
     turn: firstTurn,
     playerPlayedCards: [],
     opponentPlayedCards: [],
@@ -159,11 +146,43 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
     opponentDrawModifications: [],
     battleLog
   };
+
+  // --- BEFORE DRAW phase ---
+  triggerBeforeDraw(
+    firstTurn === Turn.PLAYER ? 'player' : 'opponent',
+    provisionalState,
+    player,
+    opponent,
+    provisionalState.battleLog
+  );
+
+  // Now perform initial draws according to ambush rules
+  if (!hasAmbush) {
+    // Normal case: opponent prepares an initial hand of 3
+    const opponentDrawResult = drawCardsWithMinionEffects(
+      provisionalState.opponentDeck,
+      provisionalState.opponentDiscardPile,
+      3,
+      'opponent',
+      player.class,
+      opponent.name
+    );
+    provisionalState.opponentHand = [
+      ...provisionalState.opponentHand, // keep any cards injected by beforeDraw (e.g., Coward)
+      ...opponentDrawResult.drawnCards
+    ];
+    provisionalState.opponentDeck = opponentDrawResult.updatedDeck;
+    provisionalState.opponentDiscardPile = opponentDrawResult.updatedDiscardPile;
+    // Add minion damage log if any (for normal case)
+    provisionalState.battleLog.push(...opponentDrawResult.minionDamageLog);
+  }
+
+  return provisionalState;
 }
 
 export function calculateCardDamage(card: Card, player: Player): number {
   let damage = card.attack || 0;
-  
+
   // Apply passive effects
   player.passives.forEach(passive => {
     switch (passive.effect) {
@@ -173,7 +192,8 @@ export function calculateCardDamage(card: Card, player: Player): number {
         }
         break;
       case 'spell_damage_bonus':
-        if (card.effect?.includes('spell') || card.class === 'wizard') {
+        // Bonus ai maghi senza affidarsi a stringhe nell'effetto
+        if (card.class === PlayerClass.WIZARD) {
           damage += 3;
         }
         break;
@@ -226,22 +246,25 @@ export function calculateDamageWithStatusEffects(damage: number, attackerStatusE
   return { finalDamage: Math.max(0, finalDamage), evaded, consumeEvasive };
 }
 
-export function applyStatusEffect(targetEffects: any[], effectType: string, value: number, duration: number): any[] {
+export function applyStatusEffect(
+  targetEffects: any[],
+  effectType: StatusType,
+  value: number,
+  duration: number
+): any[] {
   const newEffects = [...targetEffects];
   const existingEffect = newEffects.find(effect => effect.type === effectType);
-  
+
   if (existingEffect) {
-    if (effectType === 'bleeding') {
+    if (effectType === StatusType.BLEEDING) {
       // Bleeding stacks up to 5 maximum
       existingEffect.value = Math.min(5, existingEffect.value + value);
-      // Bleeding doesn't use duration, but we'll keep it for consistency
       existingEffect.duration = duration;
-    } else if (effectType === 'evasive') {
+    } else if (effectType === StatusType.EVASIVE) {
       // Evasive stacks up to 3 maximum
       existingEffect.value = Math.min(3, existingEffect.value + value);
-      // Evasive doesn't use duration for consumption, but we'll keep it for consistency
       existingEffect.duration = duration;
-    } else if (effectType === 'weak') {
+    } else if (effectType === StatusType.WEAK) {
       // Weak does not stack, only refresh duration
       existingEffect.duration = duration;
     } else {
@@ -253,11 +276,16 @@ export function applyStatusEffect(targetEffects: any[], effectType: string, valu
     // Add new effect
     newEffects.push({
       type: effectType,
-      value: effectType === 'bleeding' ? Math.min(5, value) : effectType === 'evasive' ? Math.min(3, value) : value,
-      duration: duration
+      value:
+        effectType === StatusType.BLEEDING
+          ? Math.min(5, value)
+          : effectType === StatusType.EVASIVE
+          ? Math.min(3, value)
+          : value,
+      duration
     });
   }
-  
+
   return newEffects;
 }
 
@@ -296,7 +324,7 @@ export function consumeEvasiveStack(targetEffects: any[]): any[] {
     
     // If Evasive reaches 0, remove the effect entirely
     if (evasiveEffect.value === 0) {
-      return targetEffects.filter(effect => effect.type !== 'evasive');
+      return targetEffects.filter(effect => effect.type !== StatusType.EVASIVE);
     }
   }
   
@@ -314,121 +342,30 @@ export function shuffleCardsIntoDeck(deck: Deck, cardsToAdd: Card[]): Deck {
   };
 }
 
-export function createWolfMinionCards(): Card[] {
-  dbg('=== CREATE WOLF MINION CARDS DEBUG ===');
-  // Create 2 Wolf minion cards
-  const wolfMinions = [
-    {
-      id: 'beast_wolf_minion_1',
-      name: 'Wolf',
-      description: 'Unplayable minion. Deal 5 damage to player when drawn.',
-      cost: 0,
-      attack: 5,
-      effect: 'Deal damage when drawn',
-      class: 'beast',
-      rarity: 'special',
-      types: [CardType.MINION],
-      unplayable: true
-    },
-    {
-      id: 'beast_wolf_minion_2',
-      name: 'Wolf',
-      description: 'Unplayable minion. Deal 5 damage to player when drawn.',
-      cost: 0,
-      attack: 5,
-      effect: 'Deal damage when drawn',
-      class: 'beast',
-      rarity: 'special',
-      types: [CardType.MINION],
-      unplayable: true
-    }
-  ];
-  dbg('Created wolf minions:', wolfMinions);
-  dbg('=== CREATE WOLF MINION CARDS COMPLETE ===');
-  return wolfMinions;
-}
+function convertDuration(description: string, keyword: string): string {
+  const regex = new RegExp(`Apply (\\d+) ${keyword}`, 'i');
+  const match = description.match(regex);
 
-export function formatCardDescription(description: string): string {
-  // Handle undefined or empty description
-  if (!description) {
-    return '';
+  if (match) {
+    const totalTurns = parseInt(match[1], 10);
+    const playerTurns = Math.ceil(totalTurns / 2); // convert to player turns
+    return description.replace(regex, `Apply ${playerTurns} ${keyword}`);
   }
-  
-  // Remove "Unplayable minion. " prefix from minion card descriptions
-  const minionPrefixMatch = description.match(/^Unplayable minion\. (.+)$/);
-  if (minionPrefixMatch) {
-    description = minionPrefixMatch[1];
-  }
-  
-  // Convert "Apply X weak" to "Apply Y weak" where Y is the number of player turns
-  const weakMatch = description.match(/Apply (\d+) weak/i);
-  if (weakMatch) {
-    const totalTurns = parseInt(weakMatch[1]);
-    const playerTurns = Math.ceil(totalTurns / 2); // Convert to player turns (round up)
-    return description.replace(/Apply (\d+) weak/i, `Apply ${playerTurns} weak`);
-  }
-  
-  // Convert "Apply X vulnerable" to "Apply Y vulnerable" 
-  const vulnerableMatch = description.match(/Apply (\d+) vulnerable/i);
-  if (vulnerableMatch) {
-    const totalTurns = parseInt(vulnerableMatch[1]);
-    const playerTurns = Math.ceil(totalTurns / 2);
-    return description.replace(/Apply (\d+) vulnerable/i, `Apply ${playerTurns} vulnerable`);
-  }
-  
-  // Convert "Apply X strength" to "Apply Y strength"
-  const strengthMatch = description.match(/Apply (\d+) strength/i);
-  if (strengthMatch) {
-    const totalTurns = parseInt(strengthMatch[1]);
-    const playerTurns = Math.ceil(totalTurns / 2);
-    return description.replace(/Apply (\d+) strength/i, `Apply ${playerTurns} strength`);
-  }
-  
-  // Convert "Apply X dexterity" to "Apply Y dexterity"
-  const dexterityMatch = description.match(/Apply (\d+) dexterity/i);
-  if (dexterityMatch) {
-    const totalTurns = parseInt(dexterityMatch[1]);
-    const playerTurns = Math.ceil(totalTurns / 2);
-    return description.replace(/Apply (\d+) dexterity/i, `Apply ${playerTurns} dexterity`);
-  }
-  
+
   return description;
 }
 
-export function formatCardEffect(effectText: string): string {
-  // Convert "Apply X weak" to "Apply Y weak" where Y is the number of player turns
-  const weakMatch = effectText.match(/Apply (\d+) weak/i);
-  if (weakMatch) {
-    const totalTurns = parseInt(weakMatch[1]);
-    const playerTurns = Math.ceil(totalTurns / 2); // Convert to player turns (round up)
-    return effectText.replace(/Apply (\d+) weak/i, `Apply ${playerTurns} weak`);
-  }
-  
-  // Convert "Apply X vulnerable" to "Apply Y vulnerable" 
-  const vulnerableMatch = effectText.match(/Apply (\d+) vulnerable/i);
-  if (vulnerableMatch) {
-    const totalTurns = parseInt(vulnerableMatch[1]);
-    const playerTurns = Math.ceil(totalTurns / 2);
-    return effectText.replace(/Apply (\d+) vulnerable/i, `Apply ${playerTurns} vulnerable`);
-  }
-  
-  // Convert "Apply X strength" to "Apply Y strength"
-  const strengthMatch = effectText.match(/Apply (\d+) strength/i);
-  if (strengthMatch) {
-    const totalTurns = parseInt(strengthMatch[1]);
-    const playerTurns = Math.ceil(totalTurns / 2);
-    return effectText.replace(/Apply (\d+) strength/i, `Apply ${playerTurns} strength`);
-  }
-  
-  // Convert "Apply X dexterity" to "Apply Y dexterity"
-  const dexterityMatch = effectText.match(/Apply (\d+) dexterity/i);
-  if (dexterityMatch) {
-    const totalTurns = parseInt(dexterityMatch[1]);
-    const playerTurns = Math.ceil(totalTurns / 2);
-    return effectText.replace(/Apply (\d+) dexterity/i, `Apply ${playerTurns} dexterity`);
-  }
-  
-  return effectText;
+export function formatCardDescription(description: string): string {
+  if (!description) return '';
+
+  const keywords = ['weak', 'vulnerable', 'strength', 'dexterity'];
+  let formatted = description;
+
+  keywords.forEach(keyword => {
+    formatted = convertDuration(formatted, keyword);
+  });
+
+  return formatted;
 }
 
 export function getStatusDisplayDuration(effectType: string, duration: number): number {
@@ -439,42 +376,6 @@ export function getStatusDisplayDuration(effectType: string, duration: number): 
 export function getActualDurationFromDisplay(displayDuration: number): number {
   // Convert displayed player turns back to actual total duration
   return displayDuration * 2;
-}
-
-export function parseCardEffect(effectText: string): { type: string; value: number; target: string } | null {
-  const weakMatch = effectText.match(/Apply (\d+) weak/i);
-  const vulnerableMatch = effectText.match(/Apply (\d+) vulnerable/i);
-  const strengthMatch = effectText.match(/Apply (\d+) strength/i);
-  const dexterityMatch = effectText.match(/Apply (\d+) dexterity/i);
-  const bleedMatch = effectText.match(/Apply bleed (\d+)/i);
-  
-  if (weakMatch) {
-    return { type: 'weak', value: parseInt(weakMatch[1]), target: 'opponent' };
-  }
-  if (vulnerableMatch) {
-    return { type: 'vulnerable', value: parseInt(vulnerableMatch[1]), target: 'opponent' };
-  }
-  if (strengthMatch) {
-    return { type: 'strength', value: parseInt(strengthMatch[1]), target: 'player' };
-  }
-  if (dexterityMatch) {
-    return { type: 'dexterity', value: parseInt(dexterityMatch[1]), target: 'player' };
-  }
-  if (bleedMatch) {
-    return { type: 'bleeding', value: parseInt(bleedMatch[1]), target: 'opponent' };
-  }
-  
-  return null;
-}
-
-export function parseFormattedCardEffect(effectText: string): { type: string; value: number; target: string } | null {
-  // Parse the formatted effect text (which shows display durations)
-  const formattedEffectText = formatCardEffect(effectText);
-  return parseCardEffect(formattedEffectText);
-}
-
-export function hasSpecialEffect(card: Card): boolean {
-  return card.effect === 'Damage + current block' || card.effect === 'Persistent block' || card.effect === 'Bonus damage vs bleeding';
 }
 
 export function calculateKillingInstinctDamage(card: Card, player: Player, battleState: BattleState): number {
@@ -495,7 +396,7 @@ export function calculateKillingInstinctDamage(card: Card, player: Player, battl
         }
         break;
       case 'spell_damage_bonus':
-        if (card.effect?.includes('spell') || card.class === 'wizard') {
+        if (card.class === PlayerClass.WIZARD) {
           damage += 3;
         }
         break;
@@ -507,7 +408,7 @@ export function calculateKillingInstinctDamage(card: Card, player: Player, battl
 
 export function addDrawModification(
   modifications: DrawModification[],
-  type: 'add' | 'subtract' | 'set',
+  type: DrawModType,
   value: number,
   source: string,
   duration: number
@@ -550,54 +451,80 @@ export function addDrawModification(
   return newModifications;
 }
 
-export function triggerStartOfTurnEffects(character: Player | Opponent, battleState: BattleState, turnOwner: 'player' | 'opponent'): string[] {
-  const log: string[] = [];
-  
-  // Clear Evasive stacks at the start of the turn
-  const targetEffects = turnOwner === 'player' ? battleState.playerStatusEffects : battleState.opponentStatusEffects;
-  const evasiveEffect = targetEffects.find(effect => effect.type === StatusType.EVASIVE);
-  
-  if (evasiveEffect && evasiveEffect.value > 0) {
-    const evasiveCount = evasiveEffect.value;
-    // Remove all Evasive stacks
-    const updatedEffects = targetEffects.filter(effect => effect.type !== 'evasive');
-    
-    if (turnOwner === 'player') {
-      battleState.playerStatusEffects = updatedEffects;
-    } else {
-      battleState.opponentStatusEffects = updatedEffects;
+export function triggerBeforeDraw(
+  side: 'player' | 'opponent',
+  battleState: BattleState,
+  player: Player,
+  opponent: Opponent,
+  log: string[]
+) {
+  // 1) PASSIVES: scan both sides for beforeDraw triggers
+  const applyBeforeDrawPassives = (who: 'player' | 'opponent') => {
+    const actor = who === 'player' ? player : opponent;
+    const oppName = opponent.name;
+    const pClass = player.class;
+
+    // NOTE: both players and opponents can have multiple passives now
+    const passives = Array.isArray((actor as any).passives) ? (actor as any).passives : [];
+
+    for (const p of passives) {
+      switch (p.effect) {
+        case 'start_of_turn_coward': {
+          // Only triggers for opponent below 50% HP, adds a volatile Cower card
+          if (who === 'opponent') {
+            const hpPct = opponent.health / opponent.maxHealth;
+            if (hpPct < 0.5) {
+              const volatileCowerCard: Card = {
+                id: `goblin_cower_volatile_${Date.now()}`,
+                name: 'Cower',
+                description: 'Gain 1 Evasive. Volatile.',
+                cost: 0,
+                class: OpponentType.MONSTER,
+                rarity: Rarity.COMMON,
+                types: [CardType.SKILL, CardType.VOLATILE],
+                effects: [
+                  { code: EffectCode.gain_evasive_self, params: { amount: 1 } }
+                ],
+                unplayable: false
+              };
+              battleState.opponentHand.push(volatileCowerCard);
+              log.push(
+                formatLogText(
+                  `${opponent.name}'s Coward passive triggers! Added volatile Cower to hand.`,
+                  pClass,
+                  oppName
+                )
+              );
+            }
+          }
+          break;
+        }
+
+        // Add other passives that should trigger at beforeDraw here
+        // case 'some_before_draw_passive': { ...; break; }
+      }
     }
-    
-    log.push(formatLogText(`${turnOwner === 'player' ? character.class : character.name} lost ${evasiveCount} Evasive at start of turn.`, 
-      turnOwner === 'player' ? character.class : character.name, 
-      turnOwner === 'player' ? character.name : character.class));
-  }
-  
-  // Check if character has the Coward passive and it's their turn
-  if (character.passive && character.passive.effect === 'start_of_turn_coward' && turnOwner === 'opponent') {
-    const healthPercentage = character.health / character.maxHealth;
-    
-    if (healthPercentage < 0.5) {
-      // Create volatile Cower card and add to hand
-      const volatileCowerCard = {
-        id: 'goblin_cower_volatile',
-        name: 'Cower',
-        description: 'Gain 1 Evasive. Volatile.',
-        cost: 0,
-        effect: 'Gain 1 Evasive',
-        class: 'monster',
-        rarity: 'common',
-        types: [CardType.SKILL, CardType.VOLATILE]
-      };
-      
-      battleState.opponentHand.push(volatileCowerCard);
-      log.push(formatLogText(`${character.name}'s Coward passive triggers! Added volatile Cower to hand.`, 
-        turnOwner === 'player' ? character.class : character.name, 
-        turnOwner === 'player' ? character.name : character.class));
-    }
-  }
-  
-  return log;
+  };
+
+  // Run passives for both sides
+  applyBeforeDrawPassives('player');
+  applyBeforeDrawPassives('opponent');
+
+  // 2) STATUSES: decrement duration on both sides (remove expired)
+  const tickStatuses = (effects: StatusEffect[]) =>
+    effects
+      .map(e => ({
+        ...e,
+        // only decrement if it actually has a duration counter
+        duration: typeof e.duration === 'number' ? Math.max(0, e.duration - 1) : e.duration
+      }))
+      // keep if no duration (undefined), or duration > 0, or it’s a special “persistent while value>0” kind
+      .filter(e =>
+        typeof e.duration !== 'number' || e.duration > 0 || e.type === StatusType.BLEEDING || e.type === StatusType.EVASIVE
+      );
+
+  battleState.playerStatusEffects   = tickStatuses(battleState.playerStatusEffects);
+  battleState.opponentStatusEffects = tickStatuses(battleState.opponentStatusEffects);
 }
 
 export function updateDrawModifications(modifications: DrawModification[]): DrawModification[] {
@@ -614,7 +541,7 @@ export function calculateModifiedDrawCount(baseDrawCount: number, modifications:
   let modifiedCount = baseDrawCount;
   
   // Process 'set' modifications first (they override base value)
-  const setModifications = modifications.filter(mod => mod.type === StatusType.SET);
+  const setModifications = modifications.filter(mod => mod.type === DrawModType.SET);
   if (setModifications.length > 0) {
     // Use the most recent set modification (last in array)
     modifiedCount = setModifications[setModifications.length - 1].value;
@@ -622,14 +549,14 @@ export function calculateModifiedDrawCount(baseDrawCount: number, modifications:
   
   // Then process 'add' modifications
   modifications
-    .filter(mod => mod.type === StatusType.ADD)
+    .filter(mod => mod.type === DrawModType.ADD)
     .forEach(mod => {
       modifiedCount += mod.value;
     });
   
   // Finally process 'subtract' modifications
   modifications
-    .filter(mod => mod.type === StatusType.SUBTRACT)
+    .filter(mod => mod.type === DrawModType.SUBTRACT)
     .forEach(mod => {
       modifiedCount = Math.max(0, modifiedCount - mod.value); // Don't go below 0
     });
@@ -679,7 +606,7 @@ export function calculateRiposteDamage(card: Card, player: Player, battleState: 
         }
         break;
       case 'spell_damage_bonus':
-        if (card.effect?.includes('spell') || card.class === 'wizard') {
+        if (card.class === PlayerClass.WIZARD) {
           damage += 3;
         }
         break;
@@ -720,7 +647,7 @@ export function getCardCost(card: Card, player: Player): number {
 }
 
 // Helper function to format log text with bold keywords and card names
-export function formatLogText(text: string, playerClass: string = 'warrior', opponentName: string = 'Alpha Wolf', cardName: string = ''): string {
+export function formatLogText(text: string, playerClass: PlayerClass = PlayerClass.WARRIOR, opponentName: string = 'Alpha Wolf', cardName: string = ''): string {
   // Keywords to bold
   const keywords = ['damage', 'block', 'bleeding', 'weak', 'vulnerable', 'strength', 'dexterity', 'applied', 'deals', 'gains', 'breaks'];
   const cardNames = ['Alpha Claws', 'Vicious Bite', 'Terrifying Howl', 'Call the Pack', 'Killing Instinct', 'Strike', 'Defend', 'Bash', 'Riposte', 'Shield Up', 'Press the Attack'];
@@ -781,243 +708,140 @@ export function canPlayCard(card: Card, player: Player, energy: number, battleSt
   return true;
 }
 
-export function playCard(
-  card: Card, 
-  player: Player, 
-  opponent: Opponent, 
-  battleState: BattleState
-): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
-  const log: string[] = [];
-  const cost = getCardCost(card, player);
-  
-  // Special handling for Call the Pack - handle it immediately and directly
-  dbg('=== CALL THE PACK DEBUG ===');
-  dbg('Card being played:', card);
-  dbg('Card name:', card.name);
-  dbg('Card ID:', card.id);
-  dbg('Card name lowercase:', card.name?.toLowerCase());
-  dbg('Includes "call the pack":', card.name?.toLowerCase().includes('call the pack'));
-  dbg('ID check - call_pack:', card.id === 'call_pack');
-  dbg('ID check - beast_pack_mentality:', card.id === 'beast_pack_mentality');
-  
-  if ((card.name && card.name.toLowerCase().includes('call the pack')) || 
-      (card.id && (card.id === 'call_pack' || card.id === 'beast_pack_mentality'))) {
-    
-    dbg('✅ CALL THE PACK CARD DETECTED! Processing directly...');
-    
-    // Remove card from hand
-    const cardIndex = battleState.playerHand.findIndex(c => c.id === card.id);
-    dbg('Card index in hand:', cardIndex);
-    if (cardIndex !== -1) {
-      dbg('Removing card from hand at index:', cardIndex);
-      battleState.playerHand.splice(cardIndex, 1);
-    }
-    
-    // Add Wolf minions to player's discard pile
-    dbg('Creating Wolf minions...');
-    const wolfMinions = createWolfMinionCards();
-    dbg('Wolf minions created:', wolfMinions);
-    
-    const newBattleState = {
-      ...battleState,
-      playerHand: [...battleState.playerHand],
-      playerDiscardPile: [...battleState.playerDiscardPile, ...wolfMinions], // Only add Wolf minions for player's Call the Pack
-      playerEnergy: battleState.playerEnergy - cost,
-      playerPlayedCards: [...battleState.playerPlayedCards, card]
-    };
-    
-    dbg('New battle state discard pile:', newBattleState.playerDiscardPile);
-    dbg('Discard pile length:', newBattleState.playerDiscardPile.length);
-    
-    log.push(formatLogText(`Player added 2 Wolf to their discard pile`, player.class, opponent.name, card.name));
-    
-    dbg('=== CALL THE PACK PROCESSING COMPLETE ===');
-    return { 
-      newPlayer: player, 
-      newOpponent: opponent, 
-      newBattleState, 
-      log 
-    };
-  }
-  dbg('❌ CALL THE PACK CARD NOT DETECTED, continuing with normal processing...');
-  
-  if (!canPlayCard(card, player, battleState.playerEnergy, battleState)) {
-    return { newPlayer: player, newOpponent: opponent, newBattleState: battleState, log: [formatLogText('Not enough energy or card conditions not met!', player.class, opponent.name)] };
-  }
+function playOneCard(
+  side: 'player' | 'opponent',
+  card: Card,
+  player: Player,
+  opponent: Opponent,
+  battleState: BattleState,
+  log: string[]
+): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState } {
+  const isPlayer = side === 'player';
 
   let newPlayer = { ...player };
   let newOpponent = { ...opponent };
   const newBattleState = { ...battleState };
 
-  // Remove the specific card instance from hand and add to discard pile
-  // Find the index of the card to remove (first occurrence)
-  const cardIndex = newBattleState.playerHand.findIndex(c => c.id === card.id);
-  if (cardIndex !== -1) {
-    // Remove the card at the specific index
-    const [removedCard] = newBattleState.playerHand.splice(cardIndex, 1);
-    
-    // Check if card is volatile (burned when played - doesn't go to discard)
-    const isVolatile = removedCard.types && removedCard.types.includes(CardType.VOLATILE);
+  // 1) Remove the card from the correct hand and place in discard unless volatile
+  const hand = isPlayer ? newBattleState.playerHand : newBattleState.opponentHand;
+  const discard = isPlayer ? 'playerDiscardPile' : 'opponentDiscardPile' as const;
+  const played = isPlayer ? 'playerPlayedCards' : 'opponentPlayedCards' as const;
+
+  const idx = hand.findIndex(c => c.id === card.id);
+  if (idx !== -1) {
+    const [removed] = hand.splice(idx, 1);
+    const isVolatile = !!removed.types?.includes(CardType.VOLATILE);
     if (!isVolatile) {
-      newBattleState.playerDiscardPile = [...newBattleState.playerDiscardPile, removedCard];
+      (newBattleState[discard] as Card[]) = [...(newBattleState[discard] as Card[]), removed];
     } else {
-      log.push(formatLogText(`${player.class}'s ${removedCard.name} was burned and removed from game!`, player.class, opponent.name, removedCard.name));
+      log.push(formatLogText(`${isPlayer ? newPlayer.class : newOpponent.name}'s ${removed.name} was burned and removed from game!`, newPlayer.class, newOpponent.name, removed.name));
     }
   }
-  
-  newBattleState.playerEnergy -= cost;
-  newBattleState.playerPlayedCards.push(card);
 
-  // Apply card effects
-  let wasDamageBlocked = false;
+  // 2) Deduct energy and push to played stack
+  if (isPlayer) {
+    newBattleState.playerEnergy -= getCardCost(card, newPlayer);
+  } else {
+    newBattleState.opponentEnergy -= card.cost;
+  }
+  (newBattleState[played] as Card[]).push(card);
+
+  // 3) Run effects BEFORE damage so they can modify attack/defense
+  runCardEffects(
+    card as Card & { effects?: EffectInstance[] },
+    { side, player: newPlayer, opponent: newOpponent, state: newBattleState, log },
+    log
+  );
+
+  // 4) Apply ATTACK (damage last)
   if (card.attack) {
-    let baseDamage;
-    if (card.effect === 'Damage + current block') {
-      baseDamage = calculateRiposteDamage(card, player, newBattleState);
-    } else if (card.effect === 'Bonus damage vs bleeding') {
-      baseDamage = calculateKillingInstinctDamage(card, player, newBattleState);
-    } else {
-      baseDamage = calculateCardDamage(card, player);
+    let pendingDamage = Math.max(0, card.attack || 0);
+    const defenderSE = isPlayer ? newBattleState.opponentStatusEffects : newBattleState.playerStatusEffects;
+    const isAttackCard = card.types?.includes(CardType.MELEE) || card.types?.includes(CardType.ATTACK);
+    const evasive = defenderSE.find(e => e.type === StatusType.EVASIVE && e.value > 0);
+    if (isAttackCard && evasive && pendingDamage > 0) {
+      if (isPlayer) {
+        log.push(formatLogText(`${newOpponent.name}'s Evasive prevented damage from player's ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+        newBattleState.opponentStatusEffects = consumeEvasiveStack(newBattleState.opponentStatusEffects);
+      } else {
+        log.push(formatLogText(`${newPlayer.class}'s Evasive prevented damage from ${newOpponent.name}'s ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+        newBattleState.playerStatusEffects = consumeEvasiveStack(newBattleState.playerStatusEffects);
+      }
+      pendingDamage = 0;
     }
-    
-    const damageResult = calculateDamageWithStatusEffects(
-      baseDamage, 
-      newBattleState.playerStatusEffects, 
-      newBattleState.opponentStatusEffects,
-      card
-    );
-    
-    // Check if the attack was evaded
-    if (damageResult.evaded) {
-      const evasiveMessage = formatLogText(`${opponent.name}'s Evasive prevented damage from player's ${card.name}`, player.class, opponent.name, card.name);
-      dbg('=== EVASIVE DEBUG ===');
-      dbg('Raw message:', `${opponent.name}'s Evasive prevented damage from player's ${card.name}`);
-      dbg('Formatted message:', evasiveMessage);
-      dbg('Player class:', player.class);
-      dbg('Opponent name:', opponent.name);
-      dbg('Card name:', card.name);
-      dbg('Contains target pattern?', evasiveMessage.includes("'s Evasive prevented damage from"));
-      dbg('About to push to battle log');
-      dbg('=== END EVASIVE DEBUG ===');
-      log.push(evasiveMessage);
-      // Consume one Evasive stack
-      newBattleState.opponentStatusEffects = consumeEvasiveStack(newBattleState.opponentStatusEffects);
-    } else {
-      // Apply damage to opponent's block first, then health
-      if (newBattleState.opponentBlock > 0) {
-        if (newBattleState.opponentBlock >= damageResult.finalDamage) {
-          newBattleState.opponentBlock -= damageResult.finalDamage;
-          log.push(formatLogText(`Player deals ${damageResult.finalDamage} damage to ${opponent.name}'s block with ${card.name}`, player.class, opponent.name, card.name));
-          wasDamageBlocked = true;
+
+    if (pendingDamage > 0) {
+      if (isPlayer) {
+        // apply to opponent
+        if (newBattleState.opponentBlock > 0) {
+          if (newBattleState.opponentBlock >= pendingDamage) {
+            newBattleState.opponentBlock -= pendingDamage;
+            log.push(formatLogText(`Player deals ${pendingDamage} damage to ${newOpponent.name}'s block with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+            pendingDamage = 0;
+          } else {
+            const through = pendingDamage - newBattleState.opponentBlock;
+            newBattleState.opponentBlock = 0;
+            newOpponent.health = Math.max(0, newOpponent.health - through);
+            log.push(formatLogText(`Player breaks ${newOpponent.name}'s block and deals ${through} damage with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+            pendingDamage = 0;
+          }
         } else {
-          const remainingDamage = damageResult.finalDamage - newBattleState.opponentBlock;
-          newBattleState.opponentBlock = 0;
-          newOpponent.health = Math.max(0, newOpponent.health - remainingDamage);
-          log.push(formatLogText(`Player breaks ${opponent.name}'s block and deals ${remainingDamage} damage with ${card.name}`, player.class, opponent.name, card.name));
+          newOpponent.health = Math.max(0, newOpponent.health - pendingDamage);
+          log.push(formatLogText(`Player deals ${pendingDamage} damage with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+          pendingDamage = 0;
         }
       } else {
-        newOpponent.health = Math.max(0, newOpponent.health - damageResult.finalDamage);
-        log.push(formatLogText(`Player deals ${damageResult.finalDamage} damage with ${card.name}`, player.class, opponent.name, card.name));
+        // apply to player
+        if (newBattleState.playerBlock > 0) {
+          if (newBattleState.playerBlock >= pendingDamage) {
+            newBattleState.playerBlock -= pendingDamage;
+            log.push(formatLogText(`${newOpponent.name} deals ${pendingDamage} damage to ${newPlayer.class}'s block with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+            pendingDamage = 0;
+          } else {
+            const through = pendingDamage - newBattleState.playerBlock;
+            newBattleState.playerBlock = 0;
+            newPlayer.health = Math.max(0, newPlayer.health - through);
+            log.push(formatLogText(`${newOpponent.name} breaks ${newPlayer.class}'s block and deals ${through} damage with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+            pendingDamage = 0;
+          }
+        } else {
+          newPlayer.health = Math.max(0, newPlayer.health - pendingDamage);
+          log.push(formatLogText(`${newOpponent.name} deals ${pendingDamage} damage with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+          pendingDamage = 0;
+        }
       }
     }
   }
 
+  // 5) Apply DEFENSE
   if (card.defense) {
-    const block = calculateCardBlock(card, player);
-    newBattleState.playerBlock += block;
-    log.push(formatLogText(`Player gains ${block} block from ${card.name}`, player.class, opponent.name, card.name));
-    
-    // Handle Shield Up persistent block effect
-    if (card.effect === 'Persistent block') {
-      newBattleState.playerPersistentBlock = true;
-      log.push(formatLogText(`Player's block will persist through next turn`, player.class, opponent.name, card.name));
-    }
-  }
-
-  // Apply special effects
-  if (card.effect) {
-    const parsedEffect = parseCardEffect(card.effect);
-    const formattedParsedEffect = parseFormattedCardEffect(card.effect);
-    if (parsedEffect && formattedParsedEffect) {
-      // Check if card is an attack type and damage was completely blocked
-      const isAttackCard = card.types && card.types.includes(CardType.ATTACK);
-      if (isAttackCard && wasDamageBlocked) {
-        log.push(formatLogText(`${card.name}'s effect was blocked! No ${parsedEffect.type} applied.`, player.class, opponent.name, card.name));
-      } else {
-        if (parsedEffect.target === 'opponent') {
-          // For duration-based effects (weak, vulnerable, strength, dexterity), use the parsed value as actual duration
-          let actualDuration = parsedEffect.value;
-          
-          newBattleState.opponentStatusEffects = applyStatusEffect(
-            newBattleState.opponentStatusEffects, 
-            parsedEffect.type, 
-            parsedEffect.value, 
-            actualDuration
-          );
-          // Use the formatted effect value for logging (matches card display)
-          log.push(formatLogText(`Player applied ${formattedParsedEffect.value} ${formattedParsedEffect.type} to ${opponent.name} with ${card.name}`, player.class, opponent.name, card.name));
-        } else if (parsedEffect.target === 'player') {
-          // For duration-based effects (weak, vulnerable, strength, dexterity), use the parsed value as actual duration
-          let actualDuration = parsedEffect.value;
-          
-          newBattleState.playerStatusEffects = applyStatusEffect(
-            newBattleState.playerStatusEffects, 
-            parsedEffect.type, 
-            parsedEffect.value, 
-            actualDuration
-          );
-          // Use the formatted effect value for logging (matches card display)
-          log.push(formatLogText(`Player applied ${formattedParsedEffect.value} ${formattedParsedEffect.type} to player with ${card.name}`, player.class, opponent.name, card.name));
-        }
-      }
+    const block = isPlayer ? calculateCardBlock(card, newPlayer) : (card.defense || 0);
+    if (isPlayer) {
+      newBattleState.playerBlock += block;
+      log.push(formatLogText(`Player gains ${block} block from ${card.name}`, newPlayer.class, newOpponent.name, card.name));
     } else {
-      // Handle special effects that don't follow the "Apply X" pattern
-      // Only log if something actually happens or if it's a visible effect
-      let shouldLog = false;
-      let logMessage = '';
-      
-      if (card.effect === 'Bonus damage vs bleeding') {
-        // This effect is already handled in damage calculation, no need for additional log
-        shouldLog = false;
-      } else if (card.effect === 'Damage + current block') {
-        // This effect is already handled in damage calculation, no need for additional log
-        shouldLog = false;
-      } else if (card.effect === 'Persistent block') {
-        // This is handled in the defense section, no need for additional log
-        shouldLog = false;
-      } else if (card.effect === 'Self damage for power' || card.effect === 'Self damage') {
-        // Self damage effects
-        const selfDamage = 3; // Default self damage amount
-        newPlayer.health = Math.max(0, newPlayer.health - selfDamage);
-        shouldLog = true;
-        logMessage = `Player takes ${selfDamage} self damage from ${card.name}`;
-      } else if ((card.name && card.name.toLowerCase().includes('call the pack')) || (card.id && (card.id === 'call_pack' || card.id === 'beast_pack_mentality'))) {
-        dbg('🔄 FALLBACK CALL THE PACK HANDLING - This should NOT be reached if direct handling worked!');
-        dbg('Card being processed in fallback:', card);
-        // Special handling for Call the Pack - check by card name directly
-        shouldLog = true;
-        // Create Wolf minion cards and add them to player's discard pile
-        const wolfMinions = createWolfMinionCards();
-        dbg('Wolf minions created in fallback:', wolfMinions);
-        newBattleState.playerDiscardPile = [...newBattleState.playerDiscardPile, ...wolfMinions];
-        dbg('Updated discard pile in fallback:', newBattleState.playerDiscardPile);
-        logMessage = `Player added 2 Wolf to their discard pile (FALLBACK)`;
-      } else if (card.effect.includes('shuffle') || card.effect.includes('summon') || card.effect.includes('minion')) {
-        // Other deck manipulation or summoning effects
-        shouldLog = true;
-        logMessage = `Player: ${card.name} - ${card.effect}`;
-      } else {
-        // For other unknown effects, log them for debugging/visibility
-        shouldLog = true;
-        logMessage = `Player: ${card.name} - ${card.effect}`;
-      }
-      
-      if (shouldLog) {
-        log.push(formatLogText(logMessage, player.class, opponent.name, card.name));
-      }
+      newBattleState.opponentBlock += block;
+      log.push(formatLogText(`${newOpponent.name} gains ${block} block with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
     }
   }
 
+  return { newPlayer, newOpponent, newBattleState };
+}
+
+export function playCard(
+  card: Card,
+  player: Player,
+  opponent: Opponent,
+  battleState: BattleState
+): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
+  const log: string[] = [];
+  const cost = getCardCost(card, player);
+
+  if (!canPlayCard(card, player, battleState.playerEnergy, battleState)) {
+    return { newPlayer: player, newOpponent: opponent, newBattleState: battleState, log: [formatLogText('Not enough energy or card conditions not met!', player.class, opponent.name)] };
+  }
+
+  const { newPlayer, newOpponent, newBattleState } = playOneCard('player', card, player, opponent, battleState, log);
   return { newPlayer, newOpponent, newBattleState, log };
 }
 
@@ -1031,124 +855,10 @@ function playSingleOpponentCard(
   log: string[]
 ): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
   dbg('🎮 Playing single opponent card:', cardToPlay.name);
-  
-  let newPlayer = { ...player };
-  let newOpponent = { ...opponent };
-  let newBattleState = { ...battleState };
-  
-  // Check if the card is Call the Pack
-  if ((cardToPlay.name && cardToPlay.name.toLowerCase().includes('call the pack')) || 
-      (cardToPlay.id && (cardToPlay.id === 'call_pack' || cardToPlay.id === 'beast_pack_mentality'))) {
-    dbg('✅ SINGLE CARD: CALL THE PACK DETECTED!');
-    
-    // Remove card from opponent hand
-    const cardIndex = newBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
-    if (cardIndex !== -1) {
-      newBattleState.opponentHand.splice(cardIndex, 1);
-    }
-    
-    // Add Wolf minions to player's discard pile
-    const wolfMinions = createWolfMinionCards();
-    newBattleState.playerDiscardPile = [...newBattleState.playerDiscardPile, ...wolfMinions];
-    newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, cardToPlay];
-    newBattleState.opponentEnergy = remainingEnergy - cardToPlay.cost;
-    newBattleState.opponentPlayedCards = [...newBattleState.opponentPlayedCards, cardToPlay];
-    
-    const playerClassName = player.class.charAt(0).toUpperCase() + player.class.slice(1);
-    log.push(formatLogText(`${opponent.name} added 2 Wolf to ${playerClassName} discard pile`, player.class, opponent.name, cardToPlay.name));
-    
-    return { newPlayer, newOpponent, newBattleState, log };
-  }
-  
-  // Normal card processing for non-Call the Pack cards
-  dbg('🎮 Processing normal card:', cardToPlay.name);
-  
-  // Remove the card from opponent's hand and add to discard pile
-  const cardIndex = newBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
-  if (cardIndex !== -1) {
-    const [removedCard] = newBattleState.opponentHand.splice(cardIndex, 1);
-    
-    // Check if card is volatile (burned when played - doesn't go to discard)
-    const isVolatile = removedCard.types && removedCard.types.includes(CardType.VOLATILE);
-    if (!isVolatile) {
-      newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, removedCard];
-    } else {
-      log.push(formatLogText(`${opponent.name}'s ${removedCard.name} was burned and removed from game!`, newPlayer.class, newOpponent.name, removedCard.name));
-    }
-  }
-  
-  // Deduct energy cost from opponent's energy
-  newBattleState.opponentEnergy -= cardToPlay.cost;
-  newBattleState.opponentPlayedCards.push(cardToPlay);
-  
-  // Apply card effects
-  if (cardToPlay.attack) {
-    let baseDamage = cardToPlay.attack;
-    
-    const damageResult = calculateDamageWithStatusEffects(
-      baseDamage, 
-      newBattleState.opponentStatusEffects, 
-      newBattleState.playerStatusEffects,
-      cardToPlay
-    );
-    
-    if (damageResult.evaded) {
-      const evasiveMessage = formatLogText(`${newPlayer.class}'s Evasive prevented damage from ${newOpponent.name}'s ${cardToPlay.name}`, newPlayer.class, newOpponent.name, cardToPlay.name);
-      log.push(evasiveMessage);
-    } else {
-      const totalDamage = damageResult.finalDamage;
-      
-      // Apply damage to player's block first, then health
-      if (newBattleState.playerBlock >= totalDamage) {
-        newBattleState.playerBlock -= totalDamage;
-        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} dealt ${totalDamage} damage to ${newPlayer.class}'s block`, newPlayer.class, newOpponent.name, cardToPlay.name));
-      } else {
-        const remainingDamage = totalDamage - newBattleState.playerBlock;
-        newPlayer.health = Math.max(0, newPlayer.health - remainingDamage);
-        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} broke ${newPlayer.class}'s block and dealt ${remainingDamage} damage`, newPlayer.class, newOpponent.name, cardToPlay.name));
-        newBattleState.playerBlock = 0;
-      }
-    }
-  }
-  
-  if (cardToPlay.defense) {
-    newBattleState.opponentBlock += cardToPlay.defense;
-    log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} gained ${cardToPlay.defense} block`, newPlayer.class, newOpponent.name, cardToPlay.name));
-  }
-  
-  // Apply card-specific effects
-  if (cardToPlay.effect) {
-    switch (cardToPlay.effect) {
-      case 'Apply 2 weak':
-        newBattleState.playerStatusEffects.push({
-          type: 'weak',
-          value: 2,
-          duration: 2
-        });
-        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 2 weak to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
-        break;
-      case 'Apply 1 vulnerable':
-        newBattleState.playerStatusEffects.push({
-          type: 'vulnerable',
-          value: 1,
-          duration: 3
-        });
-        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 1 vulnerable to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
-        break;
-      case 'Apply bleed 2':
-        newBattleState.playerStatusEffects.push({
-          type: 'bleeding',
-          value: 2,
-          duration: 1 // Bleeding doesn't use duration for stacking, but we'll set it
-        });
-        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 2 bleeding to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
-        break;
-      // Add more effects as needed
-    }
-  }
-  
+  const logRef = log || [];
+  const { newPlayer, newOpponent, newBattleState } = playOneCard('opponent', cardToPlay, player, opponent, battleState, logRef);
   dbg('✅ Single card play complete:', cardToPlay.name);
-  return { newPlayer, newOpponent, newBattleState, log };
+  return { newPlayer, newOpponent, newBattleState, log: logRef };
 }
 
 export function opponentPlayCard(
@@ -1322,7 +1032,7 @@ export function opponentPlayCard(
       // Wizard Arcane Power - high priority if player has spell cards
       if (card.id === 'wizard_arcane_power') {
         const hasSpellCards = currentBattleState.opponentHand.some(c => 
-          c.class === 'wizard' && c.types && (c.types.includes(CardType.ATTACK) || c.effect?.includes('spell'))
+          c.class === PlayerClass.WIZARD && c.types && c.types.includes(CardType.ATTACK)
         );
         if (hasSpellCards) {
           priority += 1500; // Very high priority when useful
@@ -1356,18 +1066,18 @@ export function opponentPlayCard(
     }
     
     // 5: Attack card with effect - MEDIUM-LOW PRIORITY
-    if (card.types && card.types.includes(CardType.ATTACK) && card.effect && card.effect !== '') {
+    if (card.types && card.types.includes(CardType.ATTACK) && card.effects && card.effects.length > 0) {
       priority += 200;
     }
     
     // 6: Simple damage attack card - LOWEST PRIORITY
-    if (card.types && card.types.includes(CardType.ATTACK) && (!card.effect || card.effect === '')) {
-      priority += 0; // Base priority, no bonus
+    if (card.types && card.types.includes(CardType.ATTACK) && (!card.effects || card.effects.length === 0)) {
+      priority += 0;
     }
     
     // Additional modifiers for better decision making
     // Special cards (rare) get high priority
-    if (card.rarity === 'rare' || card.rarity === 'special') {
+    if (card.rarity === Rarity.RARE || card.rarity === Rarity.SPECIAL) {
       priority += 50;
     }
     
@@ -1453,183 +1163,12 @@ export function opponentPlayCard(
     // Play the selected combination
     for (const cardToPlay of combination) {
       dbg('Playing card:', cardToPlay);
-      
-      // Remove the card from hand and add to discard pile (unless it's volatile)
-      const cardIndex = currentBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
-      if (cardIndex !== -1) {
-        const [removedCard] = currentBattleState.opponentHand.splice(cardIndex, 1);
-        
-        // Check if card is volatile (burned when played - doesn't go to discard)
-        const isVolatile = removedCard.types && removedCard.types.includes(CardType.VOLATILE);
-        if (!isVolatile) {
-          currentBattleState.opponentDiscardPile = [...currentBattleState.opponentDiscardPile, removedCard];
-        } else {
-          dbg(`Volatile card ${removedCard.name} was burned and removed from game`);
-        }
-      }
-      
-      currentBattleState.opponentPlayedCards.push(cardToPlay);
-      remainingEnergy -= cardToPlay.cost;
-      
-      // Apply card effects (same logic as before, but using current state)
-      let wasDamageBlocked = false;
-      if (cardToPlay.attack) {
-        let baseDamage;
-        if (cardToPlay.effect === 'Bonus damage vs bleeding') {
-          const bleedingEffect = currentBattleState.playerStatusEffects.find(effect => effect.type === StatusType.BLEEDING);
-          if (bleedingEffect && bleedingEffect.value > 0) {
-            baseDamage = 15;
-          } else {
-            baseDamage = cardToPlay.attack || 0;
-          }
-        } else {
-          baseDamage = cardToPlay.attack || 0;
-        }
-        
-        const damageResult = calculateDamageWithStatusEffects(
-          baseDamage, 
-          currentBattleState.opponentStatusEffects, 
-          currentBattleState.playerStatusEffects,
-          cardToPlay
-        );
-        
-        // Check if the attack was evaded
-        if (damageResult.evaded) {
-          log.push(formatLogText(`Player's Evasive prevented damage from ${opponent.name}'s ${cardToPlay.name}`, player.class, opponent.name, cardToPlay.name));
-          // Consume one Evasive stack
-          currentBattleState.playerStatusEffects = consumeEvasiveStack(currentBattleState.playerStatusEffects);
-        } else {
-          // Apply damage to player's block first, then health
-          if (currentBattleState.playerBlock > 0) {
-            if (currentBattleState.playerBlock >= damageResult.finalDamage) {
-              currentBattleState.playerBlock -= damageResult.finalDamage;
-              log.push(formatLogText(`${opponent.name} deals ${damageResult.finalDamage} damage to player's block with ${cardToPlay.name}`, player.class, opponent.name, cardToPlay.name));
-              wasDamageBlocked = true;
-            } else {
-              const remainingDamage = damageResult.finalDamage - currentBattleState.playerBlock;
-              currentBattleState.playerBlock = 0;
-              currentPlayer.health = Math.max(0, currentPlayer.health - remainingDamage);
-              log.push(formatLogText(`${opponent.name} breaks player's block and deals ${remainingDamage} damage with ${cardToPlay.name}`, player.class, opponent.name, cardToPlay.name));
-            }
-          } else {
-            currentPlayer.health = Math.max(0, currentPlayer.health - damageResult.finalDamage);
-            log.push(formatLogText(`${opponent.name} deals ${damageResult.finalDamage} damage with ${cardToPlay.name}`, player.class, opponent.name, cardToPlay.name));
-          }
-        }
-      }
-
-      if (cardToPlay.defense) {
-        const block = cardToPlay.defense;
-        currentBattleState.opponentBlock += block;
-        log.push(formatLogText(`${opponent.name} gains ${block} block with ${cardToPlay.name}`, player.class, opponent.name, cardToPlay.name));
-      }
-
-      // Apply special effects
-      if (cardToPlay.effect) {
-        const parsedEffect = parseCardEffect(cardToPlay.effect);
-        const formattedParsedEffect = parseFormattedCardEffect(cardToPlay.effect);
-        if (parsedEffect && formattedParsedEffect) {
-          const isAttackCard = cardToPlay.types && cardToPlay.types.includes(CardType.ATTACK);
-          if (isAttackCard && wasDamageBlocked) {
-            log.push(formatLogText(`${opponent.name}'s ${cardToPlay.name} effect was blocked! No ${parsedEffect.type} applied.`, player.class, opponent.name, cardToPlay.name));
-          } else {
-            if (parsedEffect.target === 'opponent') {
-              // For duration-based effects (weak, vulnerable, strength, dexterity), use the parsed value as actual duration
-              let actualDuration = parsedEffect.value;
-              
-              currentBattleState.playerStatusEffects = applyStatusEffect(
-                currentBattleState.playerStatusEffects, 
-                parsedEffect.type, 
-                parsedEffect.value, 
-                actualDuration
-              );
-              log.push(formatLogText(`${opponent.name} applied ${formattedParsedEffect.value} ${formattedParsedEffect.type} to player with ${cardToPlay.name}`, player.class, opponent.name, cardToPlay.name));
-            } else if (parsedEffect.target === 'player') {
-              // For duration-based effects (weak, vulnerable, strength, dexterity), use the parsed value as actual duration
-              let actualDuration = parsedEffect.value;
-              
-              currentBattleState.opponentStatusEffects = applyStatusEffect(
-                currentBattleState.opponentStatusEffects, 
-                parsedEffect.type, 
-                parsedEffect.value, 
-                actualDuration
-              );
-              log.push(formatLogText(`${opponent.name} applied ${formattedParsedEffect.value} ${formattedParsedEffect.type} to ${opponent.name} with ${cardToPlay.name}`, player.class, opponent.name, cardToPlay.name));
-            }
-          }
-        } else {
-          let shouldLog = false;
-          let logMessage = '';
-          
-          if (cardToPlay.effect === 'Bonus damage vs bleeding') {
-            shouldLog = false;
-          } else if (cardToPlay.effect === 'Damage + current block') {
-            shouldLog = false;
-          } else if (cardToPlay.effect === 'Persistent block') {
-            shouldLog = false;
-          } else if (cardToPlay.effect === 'Self damage for power' || cardToPlay.effect === 'Self damage') {
-            const selfDamage = 3;
-            currentOpponent.health = Math.max(0, currentOpponent.health - selfDamage);
-            shouldLog = true;
-            logMessage = `${opponent.name} takes ${selfDamage} self damage from ${cardToPlay.name}`;
-          } else if (cardToPlay.effect === 'Gain 1 Evasive') {
-            // Cower effect - add Evasive status effect
-            currentBattleState.opponentStatusEffects = applyStatusEffect(
-              currentBattleState.opponentStatusEffects,
-              'evasive',
-              1,
-              3 // Evasive lasts for 3 turns if not consumed
-            );
-            shouldLog = true;
-            logMessage = `${opponent.name} gained 1 Evasive from ${cardToPlay.name}`;
-          } else if (cardToPlay.effect === 'If last turn prevented damage from an attack, deal 10 damage') {
-            // Booby Trap effect - check if damage was prevented last turn
-            const lastTurnDamagePrevented = currentBattleState.battleLog.some(logEntry => 
-              logEntry.includes("'s Evasive prevented") && logEntry.includes("from")
-            );
-            
-            if (lastTurnDamagePrevented) {
-              // Deal 10 damage
-              currentPlayer.health = Math.max(0, currentPlayer.health - 10);
-              shouldLog = true;
-              logMessage = `${opponent.name}'s Booby Trap deals 10 damage! (Damage was prevented last turn)`;
-            } else {
-              // No damage dealt, but card still played
-              shouldLog = true;
-              logMessage = `${opponent.name}'s Booby Trap failed! (No damage prevented last turn)`;
-            }
-          } else if (cardToPlay.effect === 'Next turn player draw one card less') {
-            // Dirty Trick effect - add draw modification
-            currentBattleState.playerDrawModifications = addDrawModification(
-              currentBattleState.playerDrawModifications,
-              'subtract',
-              1,
-              cardToPlay.name,
-              1 // Lasts for 1 turn (next player turn)
-            );
-            shouldLog = true;
-            logMessage = `${opponent.name} used Dirty Trick! Player will draw one less card next turn`;
-          } else if (cardToPlay.effect.includes('shuffle') || cardToPlay.effect.includes('summon') || cardToPlay.effect.includes('minion')) {
-            shouldLog = true;
-            if (cardToPlay.name === 'Call the Pack') {
-              const wolfMinions = createWolfMinionCards();
-              // Add to player's discard pile, not deck
-              currentBattleState.playerDiscardPile = [...currentBattleState.playerDiscardPile, ...wolfMinions];
-              const playerClassName = player.class.charAt(0).toUpperCase() + player.class.slice(1);
-              logMessage = `${opponent.name} added 2 Wolf to ${playerClassName} discard pile`;
-            } else {
-              logMessage = `${opponent.name}: ${cardToPlay.name} - ${cardToPlay.effect}`;
-            }
-          } else {
-            shouldLog = true;
-            logMessage = `${opponent.name}: ${cardToPlay.name} - ${cardToPlay.effect}`;
-          }
-          
-          if (shouldLog) {
-            log.push(formatLogText(logMessage, player.class, opponent.name, cardToPlay.name));
-          }
-        }
-      }
+      const result = playOneCard('opponent', cardToPlay, currentPlayer, currentOpponent, currentBattleState, log);
+      currentPlayer = result.newPlayer;
+      currentOpponent = result.newOpponent;
+      currentBattleState = result.newBattleState;
+      // Update remainingEnergy from battle state to stay in sync with helper deductions
+      remainingEnergy = currentBattleState.opponentEnergy;
     }
   }
   
@@ -1646,99 +1185,8 @@ export function playOpponentCard(
   battleState: BattleState,
   cardToPlay: Card
 ): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
-  dbg('=== PLAY OPPONENT CARD START ===');
-  dbg('playOpponentCard called');
-  dbg('Card to play:', cardToPlay.name);
-  
   const log: string[] = [];
-  let newPlayer = { ...player };
-  let newOpponent = { ...opponent };
-  let newBattleState = { ...battleState };
-  
-  // Remove the card from opponent's hand and add to discard pile
-  const cardIndex = newBattleState.opponentHand.findIndex(c => c.id === cardToPlay.id);
-  if (cardIndex !== -1) {
-    const [removedCard] = newBattleState.opponentHand.splice(cardIndex, 1);
-    
-    // Check if card is volatile (burned when played - doesn't go to discard)
-    const isVolatile = removedCard.types && removedCard.types.includes(CardType.VOLATILE);
-    if (!isVolatile) {
-      newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, removedCard];
-    } else {
-      log.push(formatLogText(`${opponent.name}'s ${removedCard.name} was burned and removed from game!`, newPlayer.class, newOpponent.name, removedCard.name));
-    }
-  }
-  
-  // Deduct energy cost from opponent's energy
-  newBattleState.opponentEnergy -= cardToPlay.cost;
-  newBattleState.opponentPlayedCards.push(cardToPlay);
-  
-  // Apply card effects
-  if (cardToPlay.attack) {
-    let baseDamage = cardToPlay.attack;
-    
-    const damageResult = calculateDamageWithStatusEffects(
-      baseDamage, 
-      newBattleState.opponentStatusEffects, 
-      newBattleState.playerStatusEffects,
-      cardToPlay
-    );
-    
-    if (damageResult.evaded) {
-      const evasiveMessage = formatLogText(`${newPlayer.class}'s Evasive prevented damage from ${newOpponent.name}'s ${cardToPlay.name}`, newPlayer.class, newOpponent.name, cardToPlay.name);
-      log.push(evasiveMessage);
-    } else {
-      const totalDamage = damageResult.finalDamage;
-      
-      // Apply damage to player's block first, then health
-      if (newBattleState.playerBlock >= totalDamage) {
-        newBattleState.playerBlock -= totalDamage;
-        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} dealt ${totalDamage} damage to ${newPlayer.class}'s block`, newPlayer.class, newOpponent.name, cardToPlay.name));
-      } else {
-        const remainingDamage = totalDamage - newBattleState.playerBlock;
-        newPlayer.health = Math.max(0, newPlayer.health - remainingDamage);
-        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} broke ${newPlayer.class}'s block and dealt ${remainingDamage} damage`, newPlayer.class, newOpponent.name, cardToPlay.name));
-        newBattleState.playerBlock = 0;
-      }
-    }
-  }
-  
-  if (cardToPlay.defense) {
-    newBattleState.opponentBlock += cardToPlay.defense;
-    log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} gained ${cardToPlay.defense} block`, newPlayer.class, newOpponent.name, cardToPlay.name));
-  }
-  
-  // Apply card-specific effects
-  if (cardToPlay.effect) {
-    switch (cardToPlay.effect) {
-      case 'Apply 2 weak':
-        newBattleState.playerStatusEffects.push({
-          type: 'weak',
-          value: 2,
-          duration: 2
-        });
-        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 2 weak to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
-        break;
-      case 'Apply 1 vulnerable':
-        newBattleState.playerStatusEffects.push({
-          type: 'vulnerable',
-          value: 1,
-          duration: 3
-        });
-        log.push(formatLogText(`${newOpponent.name}'s ${cardToPlay.name} applied 1 vulnerable to ${newPlayer.class}`, newPlayer.class, newOpponent.name, cardToPlay.name));
-        break;
-      // Add more effects as needed
-    }
-  }
-  
-  dbg('=== PLAY OPPONENT CARD END ===');
-  dbg('Final player health:', newPlayer.health);
-  dbg('Final opponent health:', newOpponent.health);
-  dbg('Final player block:', newBattleState.playerBlock);
-  dbg('Final opponent block:', newBattleState.opponentBlock);
-  dbg('Battle log entries:', log);
-  
-  return { newPlayer, newOpponent, newBattleState, log };
+  return playSingleOpponentCard(cardToPlay, opponent, player, battleState, battleState.opponentEnergy, log);
 }
 
 export function drawCardsWithMinionEffects(
@@ -1746,7 +1194,7 @@ export function drawCardsWithMinionEffects(
   discardPile: Card[], 
   numCards: number = 1,
   targetPlayer: 'player' | 'opponent' = 'player',
-  playerClass: string = 'warrior',
+  playerClass: PlayerClass = PlayerClass.WARRIOR,
   opponentName: string = 'Alpha Wolf'
 ): { drawnCards: Card[], updatedDeck: Deck, updatedDiscardPile: Card[], minionDamageLog: string[] } {
   const drawnCards: Card[] = [];
@@ -1770,19 +1218,15 @@ export function drawCardsWithMinionEffects(
     const drawnCard = currentDeck.cards.shift()!;
     
     // Check if this is a Wolf minion card
-    if (drawnCard.name === 'Wolf' && drawnCard.effect === 'Deal damage when drawn') {
-      // Wolf minion deals damage when drawn
+    if (drawnCard.types?.includes(CardType.MINION) && drawnCard.unplayable && /wolf_minion/.test(drawnCard.id)) {
       const damage = drawnCard.attack || 5;
       minionDamageLog.push(formatLogText(
         `${targetPlayer === 'player' ? playerClass : opponentName} drew Wolf and takes ${damage} damage`,
         playerClass,
         opponentName
       ));
-      
-      // Add the Wolf minion to hand as an unplayable card
       drawnCards.push(drawnCard);
     } else {
-      // Normal card - add to hand
       drawnCards.push(drawnCard);
     }
   }
@@ -1843,8 +1287,8 @@ export function drawCards(battleState: BattleState, numCards: number = 1): Battl
         name: 'Card', 
         description: 'A card', 
         cost: 1, 
-        class: 'warrior' as PlayerClass, 
-        rarity: 'common' 
+        class: PlayerClass.WARRIOR,
+        rarity: Rarity.COMMON
       });
     }
   }
@@ -1857,7 +1301,7 @@ export function applyBleedingDamage(
   targetHealth: number, 
   targetName: string, 
   isPlayer: boolean,
-  playerClass: string = 'warrior',
+  playerClass: PlayerClass = PlayerClass.WARRIOR,
   opponentName: string = 'Alpha Wolf'
 ): { newHealth: number; logMessages: string[] } {
   const logMessages: string[] = [];
@@ -1884,53 +1328,56 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
   let newPlayer = { ...player };
   let newOpponent = { ...opponent };
   
-  if (newBattleState.turn === 'player') {
+  if (newBattleState.turn === Turn.PLAYER) {
     // End of player turn - discard all cards in hand (block persists until opponent's turn)
     const cardsToDiscard = [...newBattleState.playerHand];
     newBattleState.playerHand = [];
-    
+
     // Burn volatile cards that were discarded
-    const playerVolatileCardsBurned = cardsToDiscard.filter(card => 
+    const playerVolatileCardsBurned = cardsToDiscard.filter(card =>
       card.types && card.types.includes(CardType.VOLATILE)
     );
-    
+
     // Add non-volatile cards to discard pile
-    const playerNonVolatileCards = cardsToDiscard.filter(card => 
+    const playerNonVolatileCards = cardsToDiscard.filter(card =>
       !card.types || !card.types.includes(CardType.VOLATILE)
     );
     newBattleState.playerDiscardPile = [...newBattleState.playerDiscardPile, ...playerNonVolatileCards];
-    
+
     if (playerVolatileCardsBurned.length > 0) {
       log.push(formatLogText(`${newPlayer.class} burned ${playerVolatileCardsBurned.length} volatile card(s) at end of turn.`, newPlayer.class, newOpponent.name));
     }
-    
+
     if (playerNonVolatileCards.length > 0) {
       // No log for discarding cards at end of turn
     }
-    
-    // Update status effects (reduce duration)
-    newBattleState.playerStatusEffects = updateStatusEffects(newBattleState.playerStatusEffects);
-    newBattleState.opponentStatusEffects = updateStatusEffects(newBattleState.opponentStatusEffects);
-    
+
+    // (status effects duration tick now handled by triggerBeforeDraw)
+
     // Update draw modifications (reduce duration) - AFTER player turn
     newBattleState.playerDrawModifications = updateDrawModifications(newBattleState.playerDrawModifications);
     newBattleState.opponentDrawModifications = updateDrawModifications(newBattleState.opponentDrawModifications);
-    
+
     // Reset played cards for the next turn
     newBattleState.playerPlayedCards = [];
-    
-    newBattleState.turn = 'opponent';
-    
+
+    newBattleState.turn = Turn.OPPONENT;
+
     // Reset opponent energy at start of their turn
     newBattleState.opponentEnergy = 2;
-    
-    // Start of opponent turn - trigger start of turn effects
-    const startOfTurnLog = triggerStartOfTurnEffects(newOpponent, newBattleState, 'opponent');
-    log.push(...startOfTurnLog);
-    
-    // Store cards added during start of turn effects (these should be kept)
+
+    // Before opponent draw — unified beforeDraw phase
+    triggerBeforeDraw(
+      'opponent',
+      newBattleState,
+      newPlayer,
+      newOpponent,
+      log
+    );
+
+    // Store cards added during beforeDraw (these should be kept)
     const startOfTurnAddedCards = [...newBattleState.opponentHand];
-    
+
     // Start of opponent turn - apply bleeding damage to opponent
     const opponentBleedingResult = applyBleedingDamage(
       newBattleState.opponentStatusEffects,
@@ -1942,34 +1389,34 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     );
     newOpponent.health = opponentBleedingResult.newHealth;
     log.push(...opponentBleedingResult.logMessages);
-    
+
     // Start of opponent turn - draw cards with proper reshuffle logic
-    // Clear opponent's hand first, but preserve cards added during start of turn effects
-    const previousHandCards = newBattleState.opponentHand.filter(card => 
+    // Clear opponent's hand first, but preserve cards added during beforeDraw phase
+    const previousHandCards = newBattleState.opponentHand.filter(card =>
       !startOfTurnAddedCards.some(startCard => startCard.id === card.id)
     );
-    newBattleState.opponentHand = [...startOfTurnAddedCards]; // Keep start of turn cards
-    
+    newBattleState.opponentHand = [...startOfTurnAddedCards]; // Keep beforeDraw cards
+
     // Discard all previous hand cards (burn volatile ones)
-    const opponentPreviousVolatileCardsBurned = previousHandCards.filter(card => 
+    const opponentPreviousVolatileCardsBurned = previousHandCards.filter(card =>
       card.types && card.types.includes(CardType.VOLATILE)
     );
-    const opponentPreviousNonVolatileCards = previousHandCards.filter(card => 
+    const opponentPreviousNonVolatileCards = previousHandCards.filter(card =>
       !card.types || !card.types.includes(CardType.VOLATILE)
     );
     newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, ...opponentPreviousNonVolatileCards];
-    
+
     if (opponentPreviousVolatileCardsBurned.length > 0) {
       log.push(formatLogText(`${newOpponent.name} burned ${opponentPreviousVolatileCardsBurned.length} volatile card(s) from previous turn.`, newPlayer.class, newOpponent.name));
     }
-    
+
     // Calculate modified draw count based on active modifications
     const baseDrawCount = 3;
     const cardsToDraw = calculateModifiedDrawCount(baseDrawCount, newBattleState.opponentDrawModifications);
-    
+
     const drawResult = drawCardsWithMinionEffects(
-      newBattleState.opponentDeck, 
-      newBattleState.opponentDiscardPile, 
+      newBattleState.opponentDeck,
+      newBattleState.opponentDiscardPile,
       cardsToDraw,
       'opponent',
       newPlayer.class,
@@ -1978,74 +1425,77 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     newBattleState.opponentHand = [...newBattleState.opponentHand, ...drawResult.drawnCards];
     newBattleState.opponentDeck = drawResult.updatedDeck;
     newBattleState.opponentDiscardPile = drawResult.updatedDiscardPile;
-    
+
     // Enforce hand size limit for opponent (max 7 cards)
     if (newBattleState.opponentHand.length > 7) {
       const excessCards = newBattleState.opponentHand.length - 7;
       const cardsToDiscard = newBattleState.opponentHand.splice(7, excessCards);
       newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, ...cardsToDiscard];
-      
+
       // Burn volatile cards that were discarded
-      const opponentOverflowVolatileCardsBurned = cardsToDiscard.filter(card => 
+      const opponentOverflowVolatileCardsBurned = cardsToDiscard.filter(card =>
         card.types && card.types.includes(CardType.VOLATILE)
       );
-      
+
       if (opponentOverflowVolatileCardsBurned.length > 0) {
         log.push(formatLogText(`${newOpponent.name} burned ${opponentOverflowVolatileCardsBurned.length} volatile card(s) from hand overflow.`, newPlayer.class, newOpponent.name));
       }
-      
+
       // Note: Non-volatile discarded cards are not logged for opponent
     }
-    
+
     // Apply damage from Wolf minions if any
     if (drawResult.minionDamageLog.length > 0) {
       // Calculate total damage from Wolf minions
       const wolfDamage = drawResult.minionDamageLog.length * 5; // Each Wolf deals 5 damage
       newOpponent.health = Math.max(0, newOpponent.health - wolfDamage);
     }
-    
+
     log.push(...drawResult.minionDamageLog);
-    
+
     dbg(`Opponent drew ${drawResult.drawnCards.length} cards`);
   } else {
     // End of opponent turn - discard all cards in hand and reset block
     const cardsToDiscard = [...newBattleState.opponentHand];
     newBattleState.opponentHand = [];
     newBattleState.opponentBlock = 0; // Reset opponent block at end of turn
-    
+
     // Burn volatile cards that were discarded
-    const opponentEndTurnVolatileCardsBurned = cardsToDiscard.filter(card => 
+    const opponentEndTurnVolatileCardsBurned = cardsToDiscard.filter(card =>
       card.types && card.types.includes(CardType.VOLATILE)
     );
-    
+
     // Add non-volatile cards to discard pile
-    const opponentEndTurnNonVolatileCards = cardsToDiscard.filter(card => 
+    const opponentEndTurnNonVolatileCards = cardsToDiscard.filter(card =>
       !card.types || !card.types.includes(CardType.VOLATILE)
     );
     newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, ...opponentEndTurnNonVolatileCards];
-    
+
     if (opponentEndTurnVolatileCardsBurned.length > 0) {
       log.push(formatLogText(`${newOpponent.name} burned ${opponentEndTurnVolatileCardsBurned.length} volatile card(s) at end of turn.`, newPlayer.class, newOpponent.name));
     }
-    
+
     // Note: Non-volatile discarded cards are not logged for opponent
-    
-    // Update status effects (reduce duration)
-    newBattleState.playerStatusEffects = updateStatusEffects(newBattleState.playerStatusEffects);
-    newBattleState.opponentStatusEffects = updateStatusEffects(newBattleState.opponentStatusEffects);
-    
+
+    // (status effects duration tick now handled by triggerBeforeDraw)
+
     // DON'T update draw modifications here - we want them to persist for the player's draw phase
-    
+
     // Reset played cards for the next turn
     newBattleState.opponentPlayedCards = [];
-    
-    newBattleState.turn = 'player';
+
+    newBattleState.turn = Turn.PLAYER;
     newBattleState.playerEnergy = 3; // Reset energy
-    
-    // Start of player turn - trigger start of turn effects
-    const startOfTurnLog = triggerStartOfTurnEffects(newPlayer, newBattleState, 'player');
-    log.push(...startOfTurnLog);
-    
+
+    // Before player draw — unified beforeDraw phase
+    triggerBeforeDraw(
+      'player',
+      newBattleState,
+      newPlayer,
+      newOpponent,
+      log
+    );
+
     // Handle persistent block - only reset if Shield Up wasn't played
     if (!newBattleState.playerPersistentBlock) {
       newBattleState.playerBlock = 0; // Reset player block at start of new player turn
@@ -2053,7 +1503,7 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
       log.push(formatLogText('Player\'s block persists due to Shield Up effect', newPlayer.class, newOpponent.name));
       newBattleState.playerPersistentBlock = false; // Reset the flag for next time
     }
-    
+
     // Start of player turn - apply bleeding damage to player
     const playerBleedingResult = applyBleedingDamage(
       newBattleState.playerStatusEffects,
@@ -2065,18 +1515,18 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     );
     newPlayer.health = playerBleedingResult.newHealth;
     log.push(...playerBleedingResult.logMessages);
-    
+
     // Start of player turn - draw cards with proper reshuffle logic
     // Calculate modified draw count based on active modifications
     const baseDrawCount = 3;
     const cardsToDraw = calculateModifiedDrawCount(baseDrawCount, newBattleState.playerDrawModifications);
-    
+
     // Generate log message for draw modifications if any
     const drawModificationLog = formatDrawModificationLog(newBattleState.playerDrawModifications, baseDrawCount);
-    
+
     const drawResult = drawCardsWithMinionEffects(
-      newBattleState.playerDeck, 
-      newBattleState.playerDiscardPile, 
+      newBattleState.playerDeck,
+      newBattleState.playerDiscardPile,
       cardsToDraw,
       'player',
       newPlayer.class,
@@ -2085,23 +1535,23 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     newBattleState.playerHand = [...newBattleState.playerHand, ...drawResult.drawnCards];
     newBattleState.playerDeck = drawResult.updatedDeck;
     newBattleState.playerDiscardPile = drawResult.updatedDiscardPile;
-    
+
     // Add draw modification log if there were any active modifications
     if (drawModificationLog) {
       log.push(formatLogText(drawModificationLog, newPlayer.class, newOpponent.name));
     }
-    
+
     // Apply damage from Wolf minions if any
     if (drawResult.minionDamageLog.length > 0) {
       // Calculate total damage from Wolf minions
       const wolfDamage = drawResult.minionDamageLog.length * 5; // Each Wolf deals 5 damage
       newPlayer.health = Math.max(0, newPlayer.health - wolfDamage);
     }
-    
+
     log.push(...drawResult.minionDamageLog);
-    
+
     dbg(`Player drew ${drawResult.drawnCards.length} cards`);
-    
+
     // NOW update draw modifications AFTER the player has drawn their cards
     newBattleState.playerDrawModifications = updateDrawModifications(newBattleState.playerDrawModifications);
     newBattleState.opponentDrawModifications = updateDrawModifications(newBattleState.opponentDrawModifications);

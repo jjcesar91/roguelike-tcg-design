@@ -1,4 +1,4 @@
-import { Card, PlayerClass, OpponentType, CardType } from '@/types/game';
+import { Card, PlayerClass, OpponentType, CardType, Rarity, EffectCode, StatusType } from '@/types/game';
 
 // Base card definitions for each player class.  Adding new cards is as simple
 // as appending to the appropriate array here.
@@ -10,8 +10,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 6 damage',
       cost: 1,
       attack: 6,
-      class: 'warrior',
-      rarity: 'common',
+      class: PlayerClass.WARRIOR,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -20,8 +20,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Gain 5 block',
       cost: 1,
       defense: 5,
-      class: 'warrior',
-      rarity: 'common',
+      class: PlayerClass.WARRIOR,
+      rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
     {
@@ -30,9 +30,11 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 8 damage. Apply 2 vulnerable.',
       cost: 2,
       attack: 8,
-      effect: 'Apply 2 vulnerable',
-      class: 'warrior',
-      rarity: 'common',
+      effects: [
+        { code: EffectCode.apply_status, params: { target: 'opponent', status: 'vulnerable', amount: 2 } }
+      ],
+      class: PlayerClass.WARRIOR,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -41,9 +43,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 8 damage + your current block',
       cost: 2,
       attack: 8,
-      effect: 'Damage + current block',
-      class: 'warrior',
-      rarity: 'rare',
+      class: PlayerClass.WARRIOR,
+      rarity: Rarity.RARE,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -52,9 +53,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Gain 8 block. Next turn, you don\'t lose block at the end of enemy turn',
       cost: 1,
       defense: 8,
-      effect: 'Persistent block',
-      class: 'warrior',
-      rarity: 'rare',
+      class: PlayerClass.WARRIOR,
+      rarity: Rarity.RARE,
       types: [CardType.SKILL]
     },
     {
@@ -63,8 +63,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 12 damage',
       cost: 3,
       attack: 12,
-      class: 'warrior',
-      rarity: 'rare',
+      class: PlayerClass.WARRIOR,
+      rarity: Rarity.RARE,
       types: [CardType.MELEE, CardType.ATTACK]
     }
   ],
@@ -75,8 +75,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 6 damage',
       cost: 1,
       attack: 6,
-      class: 'rogue',
-      rarity: 'common',
+      class: PlayerClass.ROGUE,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -85,8 +85,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Gain 5 block',
       cost: 1,
       defense: 5,
-      class: 'rogue',
-      rarity: 'common',
+      class: PlayerClass.ROGUE,
+      rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
     {
@@ -95,9 +95,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 10 damage. Costs 0 if this is the first card played.',
       cost: 1,
       attack: 10,
-      effect: 'Free on first play',
-      class: 'rogue',
-      rarity: 'common',
+      class: PlayerClass.ROGUE,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -105,9 +104,11 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       name: 'Poison',
       description: 'Apply 3 poison',
       cost: 1,
-      effect: 'Apply 3 poison',
-      class: 'rogue',
-      rarity: 'rare',
+      effects: [
+        { code: EffectCode.apply_status, params: { target: 'opponent', status: 'poison', amount: 3 } }
+      ],
+      class: PlayerClass.ROGUE,
+      rarity: Rarity.RARE,
       types: [CardType.SKILL]
     },
     {
@@ -116,9 +117,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 4 damage. Draw 1 card.',
       cost: 0,
       attack: 4,
-      effect: 'Draw 1 card',
-      class: 'rogue',
-      rarity: 'rare',
+      class: PlayerClass.ROGUE,
+      rarity: Rarity.RARE,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -127,9 +127,11 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Gain 15 block. Become invisible until next turn.',
       cost: 2,
       defense: 15,
-      effect: 'Invisibility',
-      class: 'rogue',
-      rarity: 'rare',
+      effects: [
+        { code: EffectCode.apply_status, params: { target: 'self', status: 'invisible', amount: 1 } }
+      ],
+      class: PlayerClass.ROGUE,
+      rarity: Rarity.RARE,
       types: [CardType.SKILL]
     }
   ],
@@ -140,8 +142,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 6 damage',
       cost: 1,
       attack: 6,
-      class: 'wizard',
-      rarity: 'common',
+      class: PlayerClass.WIZARD,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -150,8 +152,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Gain 5 block',
       cost: 1,
       defense: 5,
-      class: 'wizard',
-      rarity: 'common',
+      class: PlayerClass.WIZARD,
+      rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
     {
@@ -160,9 +162,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 8 lightning damage',
       cost: 1,
       attack: 8,
-      effect: 'Lightning damage',
-      class: 'wizard',
-      rarity: 'common',
+      class: PlayerClass.WIZARD,
+      rarity: Rarity.COMMON,
       types: [CardType.ATTACK]
     },
     {
@@ -171,8 +172,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Deal 14 damage',
       cost: 2,
       attack: 14,
-      class: 'wizard',
-      rarity: 'rare',
+      class: PlayerClass.WIZARD,
+      rarity: Rarity.RARE,
       types: [CardType.ATTACK]
     },
     {
@@ -181,9 +182,11 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       description: 'Gain 10 block. Freeze enemy for 1 turn.',
       cost: 2,
       defense: 10,
-      effect: 'Freeze enemy',
-      class: 'wizard',
-      rarity: 'rare',
+      effects: [
+        { code: EffectCode.apply_status, params: { target: 'opponent', status: 'frozen', amount: 1 } }
+      ],
+      class: PlayerClass.WIZARD,
+      rarity: Rarity.RARE,
       types: [CardType.SKILL]
     },
     {
@@ -191,9 +194,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       name: 'arcane Power',
       description: 'Gain 2 energy. Your next spell costs 0.',
       cost: 1,
-      effect: 'Energy bonus + next spell free',
-      class: 'wizard',
-      rarity: 'rare',
+      class: PlayerClass.WIZARD,
+      rarity: Rarity.RARE,
       types: [CardType.POWER]
     }
   ]
@@ -210,8 +212,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 7 damage',
       cost: 1,
       attack: 7,
-      class: 'beast',
-      rarity: 'common',
+      class: OpponentType.BEAST,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -220,9 +222,11 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 5 damage. Apply bleed 2.',
       cost: 1,
       attack: 5,
-      effect: 'Apply bleed 2',
-      class: 'beast',
-      rarity: 'common',
+      effects: [
+        { code: EffectCode.apply_status, params: { target: 'player', status: 'bleed', amount: 2 } }
+      ],
+      class: OpponentType.BEAST,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -230,19 +234,39 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       name: 'Terrifying Howl',
       description: 'Apply 2 weak to player',
       cost: 2,
-      effect: 'Apply 2 weak',
-      class: 'beast',
-      rarity: 'rare',
+      effects: [
+        { code: EffectCode.apply_status, params: { target: 'player', status: 'weak', amount: 2 } }
+      ],
+      class: OpponentType.BEAST,
+      rarity: Rarity.RARE,
       types: [CardType.SKILL]
     },
     {
       id: 'beast_pack_mentality',
       name: 'Call the Pack',
-      description: 'Add 2 \'Wolf\' unplayable minion cards to the player discard pile with \'Deal 5 damage when drawn\'',
+      description: "Add 2 'Wolf' unplayable minion cards to the player discard pile with \'Deal 5 damage when drawn\')",
       cost: 2,
-      effect: 'Shuffle wolf minions',
-      class: 'beast',
-      rarity: 'rare',
+      related_cards: [
+        {
+          id: 'beast_wolf_minion_template',
+          name: 'Wolf',
+          description: 'Deal 5 damage to owner when drawn.',
+          cost: 0,
+          attack: 5,
+          effects: [
+            { code: EffectCode.deal_damage, params: { target: 'player', amount: 5 } }
+          ],
+          class: OpponentType.BEAST,
+          rarity: Rarity.SPECIAL,
+          types: [CardType.MINION],
+          unplayable: true
+        }
+      ],
+      effects: [
+        { code: EffectCode.add_card_to_opp_pile, params: { index: 0, count: 2 } }
+      ],
+      class: OpponentType.BEAST,
+      rarity: Rarity.RARE,
       types: [CardType.SKILL]
     },
     {
@@ -251,9 +275,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 12 damage. Lose 3 health',
       cost: 1,
       attack: 12,
-      effect: 'Self damage for power',
-      class: 'beast',
-      rarity: 'rare',
+      class: OpponentType.BEAST,
+      rarity: Rarity.RARE,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -262,9 +285,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Gain 8 block. All beast cards cost 1 less this turn',
       cost: 2,
       defense: 8,
-      effect: 'Cost reduction for beasts',
-      class: 'beast',
-      rarity: 'rare',
+      class: OpponentType.BEAST,
+      rarity: Rarity.RARE,
       types: [CardType.SKILL]
     },
     {
@@ -273,9 +295,11 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 10 damage. If the target is bleeding, deals 15 instead.',
       cost: 2,
       attack: 10,
-      effect: 'Bonus damage vs bleeding',
-      class: 'beast',
-      rarity: 'common',
+      effects: [
+        { code: EffectCode.damage_status_mod, params: { amount: 5, status: StatusType.BLEEDING, target: 'player' } }
+      ],
+      class: OpponentType.BEAST,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -284,8 +308,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 15 damage',
       cost: 3,
       attack: 15,
-      class: 'beast',
-      rarity: 'rare',
+      class: OpponentType.BEAST,
+      rarity: Rarity.RARE,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -294,9 +318,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Unplayable minion. Deal 5 damage to player when drawn.',
       cost: 0,
       attack: 5,
-      effect: 'Deal damage when drawn',
-      class: 'beast',
-      rarity: 'special',
+      class: OpponentType.BEAST,
+      rarity: Rarity.SPECIAL,
       types: [CardType.MINION],
       unplayable: true
     }
@@ -307,9 +330,11 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       name: 'Dirty Trick',
       description: 'Next turn player draw one card less',
       cost: 1,
-      effect: 'Next turn player draw one card less',
-      class: 'monster',
-      rarity: 'common',
+      effects: [
+        { code: EffectCode.draw_mod, params: { amount: -1, target: 'player', duration: 1 } }
+      ],
+      class: OpponentType.MONSTER,
+      rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
     {
@@ -318,8 +343,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 6 damage',
       cost: 1,
       attack: 6,
-      class: 'monster',
-      rarity: 'common',
+      class: OpponentType.MONSTER,
+      rarity: Rarity.COMMON,
       types: [CardType.RANGED, CardType.ATTACK]
     },
     {
@@ -328,8 +353,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 6 damage',
       cost: 1,
       attack: 6,
-      class: 'monster',
-      rarity: 'common',
+      class: OpponentType.MONSTER,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -337,9 +362,11 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       name: 'Cower',
       description: 'Gain 1 Evasive',
       cost: 2,
-      effect: 'Gain 1 Evasive',
-      class: 'monster',
-      rarity: 'common',
+      effects: [
+        { code: EffectCode.gain_evasive_self, params: { amount: 1 } }
+      ],
+      class: OpponentType.MONSTER,
+      rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
     {
@@ -348,9 +375,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'If last turn prevented damage from an attack, deal 10 damage',
       cost: 2,
       attack: 10,
-      effect: 'If last turn prevented damage from an attack, deal 10 damage',
-      class: 'monster',
-      rarity: 'common',
+      class: OpponentType.MONSTER,
+      rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
     {
@@ -358,9 +384,11 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       name: 'Cower',
       description: 'Gain 1 Evasive. Volatile.',
       cost: 2,
-      effect: 'Gain 1 Evasive',
-      class: 'monster',
-      rarity: 'common',
+      effects: [
+        { code: EffectCode.gain_evasive_self, params: { amount: 1 } }
+      ],
+      class: OpponentType.MONSTER,
+      rarity: Rarity.COMMON,
       types: [CardType.SKILL, CardType.VOLATILE]
     }
   ],
@@ -371,9 +399,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 5 damage. Heal 3 health',
       cost: 1,
       attack: 5,
-      effect: 'Lifesteal',
-      class: 'undead',
-      rarity: 'common',
+      class: OpponentType.UNDEAD,
+      rarity: Rarity.COMMON,
       types: [CardType.ATTACK]
     },
     {
@@ -381,9 +408,11 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       name: 'Death Curse',
       description: 'Apply 3 poison',
       cost: 2,
-      effect: 'Apply 3 poison',
-      class: 'undead',
-      rarity: 'common',
+      effects: [
+        { code: EffectCode.apply_status, params: { target: 'player', status: 'poison', amount: 3 } }
+      ],
+      class: OpponentType.UNDEAD,
+      rarity: Rarity.COMMON,
       types: [CardType.CURSE]
     },
     {
@@ -392,9 +421,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Summon 2 skeletons (6 damage each)',
       cost: 3,
       attack: 12,
-      effect: 'Summon minions',
-      class: 'undead',
-      rarity: 'rare',
+      class: OpponentType.UNDEAD,
+      rarity: Rarity.RARE,
       types: [CardType.POWER]
     }
   ],
@@ -405,8 +433,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 7 damage',
       cost: 1,
       attack: 7,
-      class: 'warrior',
-      rarity: 'common',
+      class: OpponentType.WARRIOR,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -415,8 +443,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Gain 8 block',
       cost: 1,
       defense: 8,
-      class: 'warrior',
-      rarity: 'common',
+      class: OpponentType.WARRIOR,
+      rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
     {
@@ -425,9 +453,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 5 damage to all enemies',
       cost: 2,
       attack: 5,
-      effect: 'AoE damage',
-      class: 'warrior',
-      rarity: 'rare',
+      class: OpponentType.WARRIOR,
+      rarity: Rarity.RARE,
       types: [CardType.MELEE, CardType.ATTACK]
     }
   ],
@@ -438,8 +465,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 6 damage',
       cost: 0,
       attack: 6,
-      class: 'rogue',
-      rarity: 'common',
+      class: OpponentType.ROGUE,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -448,9 +475,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 4 damage. Apply 2 poison',
       cost: 1,
       attack: 4,
-      effect: 'Apply 2 poison',
-      class: 'rogue',
-      rarity: 'common',
+      class: OpponentType.ROGUE,
+      rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
     {
@@ -459,8 +485,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 12 damage',
       cost: 2,
       attack: 12,
-      class: 'rogue',
-      rarity: 'rare',
+      class: OpponentType.ROGUE,
+      rarity: Rarity.RARE,
       types: [CardType.MELEE, CardType.ATTACK]
     }
   ],
@@ -471,8 +497,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 5 damage',
       cost: 1,
       attack: 5,
-      class: 'wizard',
-      rarity: 'common',
+      class: OpponentType.WIZARD,
+      rarity: Rarity.COMMON,
       types: [CardType.ATTACK]
     },
     {
@@ -481,8 +507,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Gain 7 block',
       cost: 1,
       defense: 7,
-      class: 'wizard',
-      rarity: 'common',
+      class: OpponentType.WIZARD,
+      rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
     {
@@ -491,8 +517,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 11 damage',
       cost: 2,
       attack: 11,
-      class: 'wizard',
-      rarity: 'rare',
+      class: OpponentType.WIZARD,
+      rarity: Rarity.RARE,
       types: [CardType.ATTACK]
     }
   ]

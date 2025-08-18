@@ -17,7 +17,7 @@ import { SplashScreen } from './game/shared/SplashScreen';
 import { StartingSplashScreen } from './game/shared/StartingSplashScreen';
 import { OpponentCardPreview } from './game/battle/OpponentCardPreview';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { PlayerClass } from '@/types/game';
+import { GamePhase, PlayerClass } from '@/types/game';
 import { OpponentAI } from '@/logic/game/OpponentAI';
 import { playerClasses } from '@/data/gameData';
 
@@ -67,10 +67,8 @@ export default function Game() {
   const handleClassSelect = (playerClass: PlayerClass) => {
     try {
       dbg('🚀 handleClassSelect called with:', playerClass);
-      const { player, opponent, battleState } = GameEngine.startGame(playerClass);
-      dbg('📋 GameEngine.startGame result:', { player, opponent, battleState: { ...battleState, turn: battleState.turn } });
       
-      const newGameState = startGame(playerClass, opponent);
+      const newGameState = startGame(playerClass);
       dbg('📋 useGameState.startGame result:', { 
         gamePhase: newGameState.gamePhase, 
         player: newGameState.player, 
@@ -81,7 +79,11 @@ export default function Game() {
       setSelectedClass(playerClass);
       
       // Show splash screen with scroll callback
-      showBattleSplash(opponent, () => {
+      if (!newGameState.currentOpponent) {
+        dbg('❌ No opponent returned from startGame; aborting splash');
+        return;
+      }
+      showBattleSplash(newGameState.currentOpponent, () => {
         dbg('🎬 Splash screen callback triggered');
         // Scroll to top after splash screen completes
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -265,7 +267,7 @@ export default function Game() {
     updatePlayer(newPlayer);
     updateOpponent(opponent);
     updateBattleState(battleState);
-    setGamePhase('battle');
+    setGamePhase(GamePhase.BATTLE);
     setAvailableCards([]);
     setAvailablePassives([]);
 
@@ -285,7 +287,7 @@ export default function Game() {
     const { newPlayer, availableCards } = GameEngine.selectPassive(gameState.player, passive);
 
     updatePlayer(newPlayer);
-    setGamePhase('card-selection');
+    setGamePhase(GamePhase.CARD_SELECTION);
     setAvailableCards(availableCards);
     setAvailablePassives([]);
 
@@ -298,7 +300,7 @@ export default function Game() {
   };
 
   const handleStartingSplashComplete = () => {
-    setGamePhase('class-selection');
+    setGamePhase(GamePhase.CLASS_SELECTION);
   };
 
   const canPlayCard = (card: any) => {

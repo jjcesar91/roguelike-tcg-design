@@ -6,21 +6,70 @@ export enum CardType {
   CURSE = 'curse',
   RANGED = 'ranged',
   MINION = 'minion',
-  VOLATILE = 'volatile'
+  VOLATILE = 'volatile',
   DEFENSE = 'defense',
   SPELL = 'spell',
 }
 
 export enum StatusType {
-  ADD = 'add',
   BLEEDING = 'bleeding',
   DEXTERITY = 'dexterity',
   EVASIVE = 'evasive',
-  SET = 'set',
   STRENGTH = 'strength',
-  SUBTRACT = 'subtract',
   VULNERABLE = 'vulnerable',
   WEAK = 'weak',
+  HANDHEX = 'handhex'
+}
+
+export enum EffectCode {
+  add_card_to_opp_pile = 'add_card_to_opp_pile',
+  apply_status = 'apply_status',
+  gain_evasive_self = 'gain_evasive_self',
+  deal_damage = 'deal_damage',
+  damage_status_mod = 'damage_status_mod',
+  draw_mod = 'draw_mod',
+}
+
+export interface EffectInstance {
+  code: EffectCode;
+  params?: any; // Narrow per-effect in the future
+}
+
+export interface EffectContext {
+  sourceCard: Card;
+  side: 'player' | 'opponent'; // who is playing the card
+  player: Player;
+  opponent: Opponent;
+  state: BattleState;
+  log: string[];
+}
+
+export enum DrawModType {
+  ADD = 'add',
+  SUBTRACT = 'subtract',
+  SET = 'set',
+}
+
+export enum PlayerClass {
+  WARRIOR = 'warrior',
+  ROGUE = 'rogue',
+  WIZARD = 'wizard',
+}
+
+export enum OpponentType {
+  BEAST = 'beast',
+  MONSTER = 'monster',
+  UNDEAD = 'undead',
+  WARRIOR = 'warrior',
+  ROGUE = 'rogue',
+  WIZARD = 'wizard',
+}
+
+export enum Rarity {
+  COMMON = 'common',
+  RARE = 'rare',
+  EPIC = 'epic',
+  SPECIAL = 'special',
 }
 
 export interface Card {
@@ -30,9 +79,10 @@ export interface Card {
   cost: number;
   attack?: number;
   defense?: number;
-  effect?: string;
+  effects?: EffectInstance[]; 
+  related_cards?: Card[];
   class: PlayerClass | OpponentType;
-  rarity: 'common' | 'rare' | 'epic' | 'special';
+  rarity: Rarity;
   types?: CardType[];
   unplayable?: boolean;
 }
@@ -68,6 +118,12 @@ export interface Player {
   level: number;
 }
 
+export enum Difficulty {
+  BASIC = 'basic',
+  MEDIUM = 'medium',
+  BOSS = 'boss',
+}
+
 export interface Opponent {
   id: string;
   name: string;
@@ -76,18 +132,19 @@ export interface Opponent {
   maxHealth: number;
   portrait: string;
   deck: Deck;
-  difficulty: 'basic' | 'medium' | 'boss';
-  passive?: OpponentPassive;
+  difficulty: Difficulty;
+  passives?: OpponentPassive[];
 }
 
-export type GamePhase = 
-  | 'starting-splash'
-  | 'class-selection'
-  | 'battle'
-  | 'card-selection'
-  | 'passive-selection'
-  | 'victory'
-  | 'defeat';
+export enum GamePhase {
+  STARTING_SPLASH = 'starting-splash',
+  CLASS_SELECTION = 'class-selection',
+  BATTLE = 'battle',
+  CARD_SELECTION = 'card-selection',
+  PASSIVE_SELECTION = 'passive-selection',
+  VICTORY = 'victory',
+  DEFEAT = 'defeat',
+}
 
 export interface GameState {
   player: Player | null;
@@ -103,16 +160,21 @@ export interface GameState {
 }
 
 export interface StatusEffect {
-  type: 'weak' | 'vulnerable' | 'strength' | 'dexterity' | 'bleeding' | 'evasive';
+  type: StatusType;
   value: number;
   duration: number;
 }
 
 export interface DrawModification {
-  type: 'add' | 'subtract' | 'set';
+  type: DrawModType;
   value: number;
   source: string; // Card name or effect source
   duration: number; // Number of turns this effect lasts (0 = permanent for this battle)
+}
+
+export enum Turn {
+  PLAYER = 'player',
+  OPPONENT = 'opponent',
 }
 
 export interface BattleState {
@@ -120,7 +182,7 @@ export interface BattleState {
   playerEnergy: number;
   opponentEnergy: number;
   opponentHand: Card[];
-  turn: 'player' | 'opponent';
+  turn: Turn;
   playerPlayedCards: Card[];
   opponentPlayedCards: Card[];
   playerDiscardPile: Card[];
@@ -137,9 +199,6 @@ export interface BattleState {
   battleLog: string[];
 }
 
-export type PlayerClass = 'warrior' | 'rogue' | 'wizard';
-export type OpponentType = 'beast' | 'monster' | 'undead' | 'warrior' | 'rogue' | 'wizard';
-
 export interface PlayerClassData {
   id: PlayerClass;
   name: string;
@@ -152,8 +211,15 @@ export interface PlayerClassData {
   available: boolean;
 }
 
+export enum IntentType {
+  ATTACK = 'attack',
+  BLOCK = 'block',
+  BUFF = 'buff',
+  DEBUFF = 'debuff',
+}
+
 export interface Intent {
-  type: CardType.ATTACK | 'block' | 'buff' | 'debuff';
+  type: IntentType;
   value: number;
   description: string;
 }

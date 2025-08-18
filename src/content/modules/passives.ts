@@ -8,21 +8,21 @@ export const passives: Record<PlayerClass, Passive[]> = {
       id: 'warrior_berserker',
       name: 'berserker Rage',
       description: 'Deal 2 extra damage when below 50% health',
-      class: 'warrior',
+      class: PlayerClass.WARRIOR,
       effect: 'damage_bonus_low_health'
     },
     {
       id: 'warrior_iron_skin',
       name: 'iron Skin',
       description: 'Gain 3 extra block from all block cards',
-      class: 'warrior',
+      class: PlayerClass.WARRIOR,
       effect: 'extra_block'
     },
     {
       id: 'warrior_weapon_master',
       name: 'weapon Master',
       description: 'Attack cards cost 1 less energy',
-      class: 'warrior',
+      class: PlayerClass.WARRIOR,
       effect: 'attack_cost_reduction'
     }
   ],
@@ -31,21 +31,21 @@ export const passives: Record<PlayerClass, Passive[]> = {
       id: 'rogue_poison_master',
       name: 'poison Master',
       description: 'Poison effects last 1 extra turn',
-      class: 'rogue',
+      class: PlayerClass.ROGUE,
       effect: 'poison_duration_bonus'
     },
     {
       id: 'rogue_shadow_dancer',
       name: 'shadow Dancer',
       description: 'Start each turn with 1 extra energy',
-      class: 'rogue',
+      class: PlayerClass.ROGUE,
       effect: 'extra_energy'
     },
     {
       id: 'rogue_deadly_precision',
       name: 'deadly Precision',
       description: 'First card each turn costs 0',
-      class: 'rogue',
+      class: PlayerClass.ROGUE,
       effect: 'first_card_free'
     }
   ],
@@ -54,21 +54,21 @@ export const passives: Record<PlayerClass, Passive[]> = {
       id: 'wizard_arcane_mastery',
       name: 'arcane Mastery',
       description: 'Spell cards deal 3 extra damage',
-      class: 'wizard',
+      class: PlayerClass.WIZARD,
       effect: 'spell_damage_bonus'
     },
     {
       id: 'wizard_mana_efficiency',
       name: 'mana Efficiency',
       description: 'Start each turn with 4 energy instead of 3',
-      class: 'wizard',
+      class: PlayerClass.WIZARD,
       effect: 'max_energy_bonus'
     },
     {
       id: 'wizard_elemental_focus',
       name: 'elemental Focus',
       description: 'Every 3rd spell costs 0',
-      class: 'wizard',
+      class: PlayerClass.WIZARD,
       effect: 'every_third_spell_free'
     }
   ]
@@ -81,7 +81,7 @@ export const opponentPassives: Record<string, OpponentPassive[]> = {
     {
       id: 'wolf_ambush',
       name: 'Ambush',
-      description: 'I play first in battle',
+      description: 'You play first in battle',
       effect: 'opponent_goes_first'
     }
   ],

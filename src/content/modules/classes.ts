@@ -16,7 +16,7 @@ export const playerClasses: Record<PlayerClass, {
   available: boolean;
 }> = {
   warrior: {
-    id: 'warrior',
+    id: PlayerClass.WARRIOR,
     name: 'Warrior',
     portrait: "https://i.imgur.com/ccO2ryT.png",
     icon: Swords,
@@ -27,7 +27,7 @@ export const playerClasses: Record<PlayerClass, {
     available: true
   },
   rogue: {
-    id: 'rogue',
+    id: PlayerClass.ROGUE,
     name: 'Rogue',
     portrait: "https://i.imgur.com/ft260IB.png",
     icon: VenetianMask,
@@ -38,7 +38,7 @@ export const playerClasses: Record<PlayerClass, {
     available: false
   },
   wizard: {
-    id: 'wizard',
+    id: PlayerClass.WIZARD,
     name: 'Wizard',
     portrait: "https://i.imgur.com/OGJGXCc.png",
     icon: Zap,

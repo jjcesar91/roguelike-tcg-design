@@ -1,5 +1,5 @@
 import { dbg } from '@/lib/debug';
-import { PlayerClass, Player, Opponent } from '@/types/game';
+import { PlayerClass, Player, Opponent, Difficulty } from '@/types/game';
 import { createPlayer, getRandomOpponent, initializeBattle, drawCardsWithReshuffle } from '@/lib/gameUtils';
 import { BattleHandler } from '../handlers/BattleHandler';
 
@@ -11,7 +11,7 @@ export class ClassHandler {
     dbg('Player created:', player);
     dbg('Player level:', player.level);
     
-    const opponent = getRandomOpponent('basic');
+    const opponent = getRandomOpponent(Difficulty.BASIC);
     dbg('Opponent created:', opponent);
     dbg('Opponent difficulty:', opponent.difficulty);
     dbg('Opponent name:', opponent.name);

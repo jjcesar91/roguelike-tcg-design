@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { GameState, PlayerClass, Player, Opponent, BattleState } from '@/types/game';
+import { GameState, PlayerClass, Player, Opponent, BattleState, GamePhase } from '@/types/game';
 import { createPlayer, getRandomOpponent, initializeBattle, getRandomCards, getRandomPassives, replaceCardInDeck, drawCardsWithReshuffle } from '@/lib/gameUtils';
+import { GameEngine } from '@/logic/game/GameEngine';
 
 export const useGameState = () => {
   const [gameState, setGameState] = useState<GameState>({
     player: null,
     currentOpponent: null,
-    gamePhase: 'starting-splash',
+    gamePhase: GamePhase.STARTING_SPLASH,
     availableCards: [],
     availablePassives: [],
     battleState: null,
@@ -25,46 +26,22 @@ export const useGameState = () => {
     console.log('Current game phase:', gameState.gamePhase);
   }, [gameState]);
 
-  const startGame = (playerClass: PlayerClass, opponent: Opponent) => {
-    const player = createPlayer(playerClass);
-    const battleState = initializeBattle(player, opponent);
-    
-    // Draw 3 cards for player's first turn using proper draw mechanics
-    // BUT only if it's the player's turn (no ambush)
-    const updatedBattleState = { ...battleState };
-    
-    if (battleState.turn === 'player') {
-      // Normal case: player goes first, draw 3 cards
-      console.log('useGameState: Normal case - player goes first, drawing 3 cards');
-      const drawResult = drawCardsWithReshuffle(
-        updatedBattleState.playerDeck, 
-        updatedBattleState.playerDiscardPile, 
-        3
-      );
-      updatedBattleState.playerHand = drawResult.drawnCards;
-      updatedBattleState.playerDeck = drawResult.updatedDeck;
-      updatedBattleState.playerDiscardPile = drawResult.updatedDiscardPile;
-    } else {
-      // Ambush case: opponent goes first, player starts with empty hand
-      console.log('useGameState: Ambush case - opponent goes first, player hand remains empty');
-      // playerHand should already be empty from initializeBattle
-    }
+  const startGame = (playerClass: PlayerClass) => {
+    const { player, opponent, battleState } = GameEngine.startGame(playerClass);
 
-    const newGameState = {
+    const nextState: GameState = {
+      ...gameStateRef.current,
       player,
       currentOpponent: opponent,
-      gamePhase: 'battle' as const,
+      battleState,
+      gamePhase: GamePhase.BATTLE,
       availableCards: [],
-      availablePassives: [],
-      battleState: updatedBattleState,
-      opponentCardPreview: {
-        card: null,
-        isVisible: false
-      }
+      availablePassives: []
     };
 
-    setGameState(newGameState);
-    return newGameState;
+    setGameState(nextState);
+    gameStateRef.current = nextState;
+    return nextState;
   };
 
   const updatePlayer = (player: Player) => {
@@ -123,7 +100,7 @@ export const useGameState = () => {
     setGameState({
       player: null,
       currentOpponent: null,
-      gamePhase: 'starting-splash',
+      gamePhase: GamePhase.STARTING_SPLASH,
       availableCards: [],
       availablePassives: [],
       battleState: null,
@@ -139,12 +116,12 @@ export const useGameState = () => {
 
     const currentLevel = gameState.player.level;
     const newLevel = gameState.player.level + 1;
-    let nextPhase: GameState['gamePhase'] = 'card-selection';
+    let nextPhase: GameState['gamePhase'] = GamePhase.CARD_SELECTION;
     let availablePassives: any[] = [];
 
     // After beating medium opponent (when current level is 2), offer passive selection
     if (currentLevel === 2) {
-      nextPhase = 'passive-selection';
+      nextPhase = GamePhase.PASSIVE_SELECTION;
       availablePassives = getRandomPassives(gameState.player.class, 3);
     }
 
@@ -152,7 +129,7 @@ export const useGameState = () => {
     if (newLevel > 3) {
       setGameState(prev => ({
         ...prev,
-        gamePhase: 'victory'
+        gamePhase: GamePhase.VICTORY
       }));
       return;
     }
@@ -171,7 +148,7 @@ export const useGameState = () => {
   const handleDefeat = () => {
     setGameState(prev => ({
       ...prev,
-      gamePhase: 'defeat'
+      gamePhase: GamePhase.DEFEAT
     }));
   };
 

@@ -1,5 +1,5 @@
 import { dbg } from '@/lib/debug';
-import { Card, Player, Opponent, BattleState } from '@/types/game';
+import { Card, Player, Opponent, BattleState, Turn } from '@/types/game';
 import { playCard, opponentPlayCard, endTurn, checkVictory, checkDefeat, canPlayCard as canPlayCardUtil } from '@/lib/gameUtils';
 
 export class BattleHandler {
@@ -28,7 +28,7 @@ export class BattleHandler {
       newBattleState,
       newPlayer,
       newOpponent,
-      isOpponentTurn: newBattleState.turn === 'opponent'
+      isOpponentTurn: newBattleState.turn === Turn.OPPONENT
     };
   }
 
