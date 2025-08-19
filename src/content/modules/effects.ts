@@ -2,8 +2,8 @@
 // Temporary in-file registry. Move to its own module (e.g. lib/effectsRegistry.ts) once
 // all cards are migrated to structured effects.
 
-import { addDrawModification, applyStatusEffect, formatLogText } from "@/lib/gameUtils";
-import { Card, DrawModType, EffectCode, EffectContext, EffectInstance, StatusType } from "@/types/game";
+import { formatLogText, applyMod, consumeModStacks } from "@/lib/gameUtils";
+import { Card, DrawModType, EffectCode, EffectContext, EffectInstance, ModType, CardType } from "@/types/game";
 
 
 function ensureArray<T>(x: T | T[] | undefined): T[] { return Array.isArray(x) ? x : x ? [x] : []; }
@@ -35,50 +35,87 @@ const EFFECTS: Record<EffectCode, (ctx: EffectContext, params?: any) => void> = 
     }
   },
 
-  // Apply status to a target
-  apply_status: (ctx, params) => {
+  add_card_to_hand: (ctx, params) => {
     const { state, side, log, opponent, player, sourceCard } = ctx;
-    const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'opponent' : 'player');
-    const type: StatusType = params?.type;
-    const value: number = params?.value ?? 1;
-    const duration: number = params?.duration ?? value;
-    if (!type) return;
+    const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'player' : 'opponent');
+    const count: number = params?.count ?? 1;
+
+    // Accept either an inline `card` template or an index into related_cards
+    const pool = Array.isArray(sourceCard.related_cards) ? sourceCard.related_cards : [];
+    const fromIndex: number | undefined = params?.index;
+    const template: Card | undefined = params?.card ?? (typeof fromIndex === 'number' ? pool[fromIndex] : undefined);
+    if (!template) return;
+
+    const copies: Card[] = Array.from({ length: count }, (_, i) => ({
+      ...template,
+      id: `${template.id}__copy_${Date.now()}_${i}`,
+    }));
 
     if (target === 'player') {
-      state.playerStatusEffects = applyStatusEffect(state.playerStatusEffects, type, value, duration);
-      log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} applied ${value} ${type} to player`, player.class, opponent.name, sourceCard.name));
+      state.playerHand.push(...copies);
+      log.push(formatLogText(`Added ${copies.length} card(s) to player's hand`, player.class, opponent.name, sourceCard.name));
     } else {
-      state.opponentStatusEffects = applyStatusEffect(state.opponentStatusEffects, type, value, duration);
-      log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} applied ${value} ${type} to ${opponent.name}`, player.class, opponent.name, sourceCard.name));
+      state.opponentHand.push(...copies);
+      log.push(formatLogText(`Added ${copies.length} card(s) to ${opponent.name}'s hand`, player.class, opponent.name, sourceCard.name));
     }
   },
 
-  // Convenience: gain evasive on self
-  gain_evasive_self: (ctx, params) => {
-    const { state, side } = ctx;
-    const duration: number = params?.duration ?? 3;
+  add_card_to_self_pile: (ctx, params) => {
+    const { state, side, log, opponent, player, sourceCard } = ctx;
+    const index: number = params?.index ?? 0;
+    const count: number = params?.count ?? 1;
+
+    const pool = Array.isArray(sourceCard.related_cards) ? sourceCard.related_cards : [];
+    const template = params?.card ?? pool[index];
+    if (!template) return;
+
+    const cardsToAdd: Card[] = Array.from({ length: count }, (_, i) => ({
+      ...template,
+      id: `${template.id}__copy_${Date.now()}_${i}`,
+    }));
+
     if (side === 'player') {
-      state.playerStatusEffects = applyStatusEffect(state.playerStatusEffects, StatusType.EVASIVE, 1, duration);
+      state.playerDiscardPile = [...state.playerDiscardPile, ...cardsToAdd];
+      log.push(formatLogText(`Player added ${cardsToAdd.length} card(s) to their discard`, player.class, opponent.name, sourceCard.name));
     } else {
-      state.opponentStatusEffects = applyStatusEffect(state.opponentStatusEffects, StatusType.EVASIVE, 1, duration);
+      state.opponentDiscardPile = [...state.opponentDiscardPile, ...cardsToAdd];
+      log.push(formatLogText(`${opponent.name} added ${cardsToAdd.length} card(s) to their discard`, player.class, opponent.name, sourceCard.name));
     }
   },
 
-  // Apply a status that modifies future draws for a duration
+  apply_mod: (ctx, params) => {
+    const { state, side, log, opponent, player, sourceCard } = ctx;
+    const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'opponent' : 'player');
+    const type: ModType = params?.type;
+    const stacks: number = params?.stacks ?? params?.value ?? 1;
+    const duration: number | undefined = params?.duration;
+    const nestedEffects = params?.effects as EffectInstance[] | undefined;
+    if (!type || stacks === 0) return;
+
+    if (target === 'player') {
+      state.playerMods = applyMod(state.playerMods, type, stacks, duration, nestedEffects);
+      log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} applied ${Math.abs(stacks)} ${type} to player`, player.class, opponent.name, sourceCard.name));
+    } else {
+      state.opponentMods = applyMod(state.opponentMods, type, stacks, duration, nestedEffects);
+      log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} applied ${Math.abs(stacks)} ${type} to ${opponent.name}`, player.class, opponent.name, sourceCard.name));
+    }
+  },
+
+  // Back-compat: map old apply_status to apply_mod
+  apply_status: (ctx, params) => EFFECTS.apply_mod(ctx, params),
+
   draw_mod: (ctx, params) => {
     const { state, side, log, opponent, player, sourceCard } = ctx;
-    const amount: number = params?.amount ?? 0; // positive -> add draws, negative -> subtract
+    const amount: number = params?.amount ?? 0;
     const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'opponent' : 'player');
     const duration: number = params?.duration ?? 1;
-
     if (!amount || duration <= 0) return;
-
     if (target === 'player') {
-      state.playerStatusEffects = applyStatusEffect(state.playerStatusEffects, StatusType.HANDHEX, amount, duration);
+      state.playerMods = applyMod(state.playerMods, ModType.HANDHEX, amount, duration);
       const verb = amount > 0 ? 'increases' : 'reduces';
       log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} ${verb} player's draws by ${Math.abs(amount)} for ${duration} turn(s)`, player.class, opponent.name, sourceCard.name));
     } else {
-      state.opponentStatusEffects = applyStatusEffect(state.opponentStatusEffects, StatusType.HANDHEX, amount, duration);
+      state.opponentMods = applyMod(state.opponentMods, ModType.HANDHEX, amount, duration);
       const verb = amount > 0 ? 'increases' : 'reduces';
       log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} ${verb} ${opponent.name}'s draws by ${Math.abs(amount)} for ${duration} turn(s)`, player.class, opponent.name, sourceCard.name));
     }
@@ -122,23 +159,130 @@ const EFFECTS: Record<EffectCode, (ctx: EffectContext, params?: any) => void> = 
     }
   },
 
-  // Bonus damage if target has a specific status (e.g., +5 if bleeding)
   damage_status_mod: (ctx, params) => {
     const { state, side, sourceCard } = ctx;
     const bonus: number = params?.amount ?? 0;
-    const status: StatusType | undefined = params?.status;
+    const mod: ModType | undefined = params?.status ?? params?.mod; // support old param name
     const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'opponent' : 'player');
-
-    if (!status || bonus <= 0) return;
-
-    const hasStatus = target === 'player'
-      ? state.playerStatusEffects.some(se => se.type === status && se.value > 0)
-      : state.opponentStatusEffects.some(se => se.type === status && se.value > 0);
-
-    if (!hasStatus) return;
-
-    // OPTION B: mutate the source card's base attack before damage is calculated
+    if (!mod || bonus <= 0) return;
+    const hasMod = target === 'player'
+      ? state.playerMods.some(m => m.type === mod && m.stacks > 0)
+      : state.opponentMods.some(m => m.type === mod && m.stacks > 0);
+    if (!hasMod) return;
     sourceCard.attack = (sourceCard.attack || 0) + bonus;
+  },
+
+  remove_mod: (ctx, params) => {
+    const { state, side } = ctx;
+    const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'opponent' : 'player');
+    const type: ModType = params?.type;
+    const stacks: number | undefined = params?.stacks;
+    if (!type) return;
+    if (target === 'player') {
+      state.playerMods = typeof stacks === 'number' ? consumeModStacks(state.playerMods, type, Math.max(1, stacks)) : state.playerMods.filter(m => m.type !== type);
+    } else {
+      state.opponentMods = typeof stacks === 'number' ? consumeModStacks(state.opponentMods, type, Math.max(1, stacks)) : state.opponentMods.filter(m => m.type !== type);
+    }
+  },
+
+  damage_bonus_low_health: (ctx, params) => {
+    const { player, opponent, side, sourceCard } = ctx;
+    const threshold: number = params?.threshold ?? 0.5;
+    const bonus: number = params?.bonus ?? 0;
+    const appliesTo: CardType[] = params?.appliesToTypes ?? [];
+    if (bonus <= 0) return;
+    const actor = side === 'player' ? player : opponent;
+    const hpPct = actor.health / actor.maxHealth;
+    const typeOk = !appliesTo?.length || appliesTo.some(t => sourceCard.types?.includes(t));
+    if (hpPct < threshold && typeOk) {
+      sourceCard.attack = (sourceCard.attack || 0) + bonus;
+    }
+  },
+
+  block_bonus_flat: (ctx, params) => {
+    const bonus: number = params?.bonus ?? 0;
+    const appliesToDefense: boolean = !!params?.appliesToDefense;
+    const appliesTo: CardType[] = params?.appliesToTypes ?? [];
+    if (bonus <= 0) return;
+    const typeOk = !appliesTo?.length || appliesTo.some(t => ctx.sourceCard.types?.includes(t));
+    if (!typeOk) return;
+    if (appliesToDefense || typeof ctx.sourceCard.defense === 'number') {
+      ctx.sourceCard.defense = (ctx.sourceCard.defense || 0) + bonus;
+    }
+  },
+
+  cost_mod: (ctx, params) => {
+    const amount: number = params?.amount ?? 0;
+    const minimum: number = typeof params?.minimum === 'number' ? params.minimum : 0;
+    const appliesTo: CardType[] = params?.appliesToTypes ?? [];
+    if (amount === 0) return;
+    const ok = !appliesTo?.length || appliesTo.some(t => ctx.sourceCard.types?.includes(t));
+    if (!ok) return;
+    ctx.sourceCard.cost = Math.max(minimum, (ctx.sourceCard.cost || 0) + amount);
+  },
+
+  mod_duration_bonus: (ctx, params) => {
+    const { state, side } = ctx;
+    const type: ModType = params?.type;
+    const amount: number = params?.amount ?? 0;
+    const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'player' : 'opponent');
+    if (!type || amount === 0) return;
+    const mods = target === 'player' ? state.playerMods : state.opponentMods;
+    const updated = mods.map(m => m.type === type ? { ...m, duration: (m.duration ?? 0) + amount } : m);
+    if (target === 'player') state.playerMods = updated; else state.opponentMods = updated;
+  },
+
+  gain_energy: (ctx, params) => {
+    const { state, player, opponent } = ctx;
+    const target: 'player' | 'opponent' = params?.target ?? 'player';
+    const amount: number = params?.amount ?? 0;
+    if (amount === 0) return;
+    if (target === 'player') state.playerEnergy = Math.max(0, Math.min(player.maxEnergy, state.playerEnergy + amount));
+    else state.opponentEnergy = Math.max(0, state.opponentEnergy + amount);
+  },
+
+  first_card_free: (ctx, params) => {
+    const { state, side } = ctx;
+    const who: 'player' | 'opponent' = params?.side ?? (side === 'player' ? 'player' : 'opponent');
+    // Mark on state; playOneCard can zero the cost of the first played card when this flag is present.
+    if (who === 'player') (state as any).__firstCardFreePlayer = true; else (state as any).__firstCardFreeOpponent = true;
+  },
+
+  damage_bonus_by_type: (ctx, params) => {
+    const bonus: number = params?.bonus ?? 0;
+    const types: CardType[] = params?.appliesToTypes ?? [];
+    if (bonus <= 0) return;
+    if (!types?.length || types.some(t => ctx.sourceCard.types?.includes(t))) {
+      ctx.sourceCard.attack = (ctx.sourceCard.attack || 0) + bonus;
+    }
+  },
+
+  set_turn_energy: (ctx, params) => {
+    const { state, player, opponent } = ctx;
+    const target: 'player' | 'opponent' = params?.target ?? 'player';
+    const amount: number = params?.amount ?? 0;
+    if (target === 'player') state.playerEnergy = Math.max(0, Math.min(player.maxEnergy, amount));
+    else state.opponentEnergy = Math.max(0, amount);
+  },
+
+  every_third_type_free: (ctx, params) => {
+    const count: number = params?.count ?? 3;
+    const types: CardType[] = params?.appliesToTypes ?? [];
+    if (count <= 1) return;
+    const key = `__typeCount_${(types || []).join('_')}_${ctx.side}`;
+    const st = ctx.state as any;
+    st[key] = (st[key] || 0) + 1;
+    if (st[key] % count === 0) {
+      if (!types?.length || types.some(t => ctx.sourceCard.types?.includes(t))) {
+        ctx.sourceCard.cost = 0;
+      }
+    }
+  },
+
+  ambush: (ctx, _params) => {
+    // This effect serves as a marker in passives; battle initialization can detect opponent passives
+    // containing EffectCode.ambush to let the opponent start first. No runtime action needed here.
+    (ctx.state as any).__ambushFlag = true;
   },
 };
 

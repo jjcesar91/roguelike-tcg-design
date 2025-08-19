@@ -1,4 +1,4 @@
-import { Card, PlayerClass, OpponentType, CardType, Rarity, EffectCode, StatusType } from '@/types/game';
+import { Card, PlayerClass, OpponentType, CardType, Rarity, EffectCode, ModType } from '@/types/game';
 
 // Base card definitions for each player class.  Adding new cards is as simple
 // as appending to the appropriate array here.
@@ -296,7 +296,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       cost: 2,
       attack: 10,
       effects: [
-        { code: EffectCode.damage_status_mod, params: { amount: 5, status: StatusType.BLEEDING, target: 'player' } }
+        { code: EffectCode.damage_status_mod, params: { amount: 5, status: ModType.BLEEDING, target: 'player' } }
       ],
       class: OpponentType.BEAST,
       rarity: Rarity.COMMON,

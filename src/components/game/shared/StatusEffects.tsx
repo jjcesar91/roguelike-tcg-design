@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { TrendingDown, AlertTriangle, TrendingUp, Target, Droplets, Shield } from 'lucide-react';
 import { StatusEffectModal } from '@/components/game/modals/StatusEffectModal';
 import { getStatusDisplayDuration } from '@/lib/gameUtils';
+import { ModType } from '@/types/game';
 
 interface StatusEffectsProps {
   effects: any[];
@@ -63,13 +64,13 @@ export const StatusEffects: React.FC<StatusEffectsProps> = ({
               className={`text-xs font-medium ${getStatusBadgeStyle(effect.type)}`}
               onClick={() => handleBadgeClick(effect)}
             >
-              {effect.type === StatusType.WEAK && <TrendingDown className="w-3 h-3 mr-1" />}
-              {effect.type === StatusType.VULNERABLE && <AlertTriangle className="w-3 h-3 mr-1" />}
-              {effect.type === StatusType.STRENGTH && <TrendingUp className="w-3 h-3 mr-1" />}
-              {effect.type === StatusType.DEXTERITY && <Target className="w-3 h-3 mr-1" />}
-              {effect.type === StatusType.BLEEDING && <Droplets className="w-3 h-3 mr-1" />}
-              {effect.type === StatusType.EVASIVE && <Shield className="w-3 h-3 mr-1" />}
-              {effect.type} {effect.type === StatusType.BLEEDING ? effect.value : effect.type === StatusType.EVASIVE ? effect.value : `(${getStatusDisplayDuration(effect.type, effect.duration)})`}
+              {effect.type === ModType.WEAK && <TrendingDown className="w-3 h-3 mr-1" />}
+              {effect.type === ModType.VULNERABLE && <AlertTriangle className="w-3 h-3 mr-1" />}
+              {effect.type === ModType.STRENGTH && <TrendingUp className="w-3 h-3 mr-1" />}
+              {effect.type === ModType.DEXTERITY && <Target className="w-3 h-3 mr-1" />}
+              {effect.type === ModType.BLEEDING && <Droplets className="w-3 h-3 mr-1" />}
+              {effect.type === ModType.EVASIVE && <Shield className="w-3 h-3 mr-1" />}
+              {effect.type} {effect.type === ModType.BLEEDING ? effect.value : effect.type === ModType.EVASIVE ? effect.value : `(${getStatusDisplayDuration(effect.type, effect.duration)})`}
             </Badge>
           ))}
         </div>

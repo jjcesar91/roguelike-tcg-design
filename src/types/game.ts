@@ -11,7 +11,7 @@ export enum CardType {
   SPELL = 'spell',
 }
 
-export enum StatusType {
+export enum ModType {
   BLEEDING = 'bleeding',
   DEXTERITY = 'dexterity',
   EVASIVE = 'evasive',
@@ -21,23 +21,64 @@ export enum StatusType {
   HANDHEX = 'handhex'
 }
 
+export const MOD_DEFS: Record<ModType, {
+  maxStacks: number;
+  defaultDuration: number;   // applyMod can use this if caller omits duration
+  stackMode: 'add' | 'replace'; // how stacks behave on reapply
+}> = {
+  [ModType.BLEEDING]:  { maxStacks: 5, defaultDuration: 2, stackMode: 'add' },
+  [ModType.EVASIVE]:   { maxStacks: 3, defaultDuration: 2, stackMode: 'add' },
+  [ModType.WEAK]:      { maxStacks: 1, defaultDuration: 2, stackMode: 'replace' },
+  [ModType.VULNERABLE]:{ maxStacks: 1, defaultDuration: 2, stackMode: 'replace' },
+  [ModType.STRENGTH]:  { maxStacks: 99, defaultDuration: 2, stackMode: 'add' },
+  [ModType.DEXTERITY]: { maxStacks: 99, defaultDuration: 2, stackMode: 'add' },
+  [ModType.HANDHEX]:   { maxStacks: 99, defaultDuration: 1, stackMode: 'add' },
+};
+
+export enum TriggerPhase {
+  BEFOREDRAW = 'beforeDraw',
+  STARTOFTURN = 'startOfTurn',
+  ONCARDRAW = 'onCardDraw',
+  ONCARDPLAY = 'onCardPlay',
+  ONTARGET = 'onTargetSelected',
+  ENDOFTURN = 'endOfTurn'
+};
+
 export enum EffectCode {
+  // ---- Card / general effects ----
   add_card_to_opp_pile = 'add_card_to_opp_pile',
+  add_card_to_self_pile = 'add_card_to_self_pile',
+  apply_mod = 'apply_mod',
+  /** @deprecated legacy alias; use apply_mod */
   apply_status = 'apply_status',
-  gain_evasive_self = 'gain_evasive_self',
+  remove_mod = 'remove_mod',
   deal_damage = 'deal_damage',
   damage_status_mod = 'damage_status_mod',
   draw_mod = 'draw_mod',
+
+  // ---- Passive-related effects ----
+  damage_bonus_low_health = 'damage_bonus_low_health',
+  block_bonus_flat = 'block_bonus_flat',
+  cost_mod = 'cost_mod',
+  mod_duration_bonus = 'mod_duration_bonus',
+  gain_energy = 'gain_energy',
+  first_card_free = 'first_card_free',
+  damage_bonus_by_type = 'damage_bonus_by_type',
+  set_turn_energy = 'set_turn_energy',
+  every_third_type_free = 'every_third_type_free',
+  ambush = 'ambush',
+  add_card_to_hand = 'add_card_to_hand',
 }
 
 export interface EffectInstance {
   code: EffectCode;
-  params?: any; // Narrow per-effect in the future
+  params?: any; 
+  trigger?: TriggerPhase;
 }
 
 export interface EffectContext {
   sourceCard: Card;
-  side: 'player' | 'opponent'; // who is playing the card
+  side: 'player' | 'opponent'; 
   player: Player;
   opponent: Opponent;
   state: BattleState;
@@ -90,16 +131,9 @@ export interface Card {
 export interface Passive {
   id: string;
   name: string;
-  description: string;
-  class: PlayerClass;
-  effect: string;
-}
-
-export interface OpponentPassive {
-  id: string;
-  name: string;
-  description: string;
-  effect: string;
+  description?: string;
+  effects: EffectInstance[]; // effect-driven, con trigger opzionale
+  owner?: 'player' | 'opponent'; // opzionale, solo per tooling/UX
 }
 
 export interface Deck {
@@ -133,7 +167,7 @@ export interface Opponent {
   portrait: string;
   deck: Deck;
   difficulty: Difficulty;
-  passives?: OpponentPassive[];
+  passives?: Passive[];
 }
 
 export enum GamePhase {
@@ -159,10 +193,12 @@ export interface GameState {
   };
 }
 
-export interface StatusEffect {
-  type: StatusType;
-  value: number;
-  duration: number;
+export type StatusEffect = ActiveMod;
+export interface ActiveMod {
+  type: ModType;         // e.g., BLEEDING, EVASIVE, HANDHEX, …
+  stacks: number;        // how many stacks (always clamped by MOD_DEFS.maxStacks)
+  duration: number;      // remaining turns (always decremented by a single tick fn)
+  effects?: EffectInstance[]; // optional phase-bound effects (e.g., “deal bleed dmg on start”)
 }
 
 export interface DrawModification {
@@ -191,8 +227,8 @@ export interface BattleState {
   opponentDeck: Deck;
   playerBlock: number;
   opponentBlock: number;
-  playerStatusEffects: StatusEffect[];
-  opponentStatusEffects: StatusEffect[];
+  playerMods: ActiveMod[];
+  opponentMods: ActiveMod[];  
   playerPersistentBlock: boolean;
   playerDrawModifications: DrawModification[];
   opponentDrawModifications: DrawModification[];

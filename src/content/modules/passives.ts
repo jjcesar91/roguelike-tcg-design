@@ -1,100 +1,167 @@
-import { PlayerClass, Passive, OpponentPassive } from '@/types/game';
+import { PlayerClass, Passive, EffectCode, ModType, CardType, TriggerPhase } from '@/types/game';
 
-// Base passive abilities for each player class.  These were previously
-// defined in gameData.ts and have been moved here for easier extension.
+// Effect-driven passives. Each passive is a bundle of EffectInstances that may
+// optionally include a `trigger` phase. This removes hard-coded conditionals.
+
 export const passives: Record<PlayerClass, Passive[]> = {
   warrior: [
     {
       id: 'warrior_berserker',
-      name: 'berserker Rage',
-      description: 'Deal 2 extra damage when below 50% health',
-      class: PlayerClass.WARRIOR,
-      effect: 'damage_bonus_low_health'
+      name: 'Berserker Rage',
+      description: 'Deal +2 damage while below 50% health.',
+      effects: [
+        {
+          code: EffectCode.damage_bonus_low_health,
+          trigger: TriggerPhase.ONCARDPLAY,
+          params: {
+            threshold: 0.5,
+            bonus: 2,
+            appliesToTypes: [CardType.ATTACK, CardType.MELEE]
+          }
+        }
+      ]
     },
     {
       id: 'warrior_iron_skin',
-      name: 'iron Skin',
-      description: 'Gain 3 extra block from all block cards',
-      class: PlayerClass.WARRIOR,
-      effect: 'extra_block'
+      name: 'Iron Skin',
+      description: 'Gain +3 block from all block cards.',
+      effects: [
+        {
+          code: EffectCode.block_bonus_flat,
+          trigger: TriggerPhase.ONCARDPLAY,
+          params: {
+            bonus: 3,
+            appliesToDefense: true
+          }
+        }
+      ]
     },
     {
       id: 'warrior_weapon_master',
-      name: 'weapon Master',
-      description: 'Attack cards cost 1 less energy',
-      class: PlayerClass.WARRIOR,
-      effect: 'attack_cost_reduction'
+      name: 'Weapon Master',
+      description: 'Attack cards cost 1 less energy.',
+      effects: [
+        {
+          code: EffectCode.cost_mod,
+          trigger: TriggerPhase.ONCARDPLAY,
+          params: {
+            amount: -1,
+            minimum: 0,
+            appliesToTypes: [CardType.ATTACK, CardType.MELEE]
+          }
+        }
+      ]
     }
   ],
   rogue: [
     {
-      id: 'rogue_poison_master',
-      name: 'poison Master',
-      description: 'Poison effects last 1 extra turn',
-      class: PlayerClass.ROGUE,
-      effect: 'poison_duration_bonus'
-    },
-    {
       id: 'rogue_shadow_dancer',
-      name: 'shadow Dancer',
-      description: 'Start each turn with 1 extra energy',
-      class: PlayerClass.ROGUE,
-      effect: 'extra_energy'
+      name: 'Shadow Dancer',
+      description: 'Start each turn with +1 energy.',
+      effects: [
+        {
+          code: EffectCode.gain_energy,
+          trigger: TriggerPhase.STARTOFTURN,
+          params: { amount: 1, target: 'player' }
+        }
+      ]
     },
     {
       id: 'rogue_deadly_precision',
-      name: 'deadly Precision',
-      description: 'First card each turn costs 0',
-      class: PlayerClass.ROGUE,
-      effect: 'first_card_free'
+      name: 'Deadly Precision',
+      description: 'The first card each turn costs 0.',
+      effects: [
+        {
+          code: EffectCode.first_card_free,
+          trigger: TriggerPhase.BEFOREDRAW,
+          params: { side: 'player' }
+        }
+      ]
     }
   ],
   wizard: [
     {
       id: 'wizard_arcane_mastery',
-      name: 'arcane Mastery',
-      description: 'Spell cards deal 3 extra damage',
-      class: PlayerClass.WIZARD,
-      effect: 'spell_damage_bonus'
+      name: 'Arcane Mastery',
+      description: 'Spell cards deal +3 damage.',
+      effects: [
+        {
+          code: EffectCode.damage_bonus_by_type,
+          trigger: TriggerPhase.ONCARDPLAY,
+          params: {
+            bonus: 3,
+            appliesToTypes: [CardType.SPELL]
+          }
+        }
+      ]
     },
     {
       id: 'wizard_mana_efficiency',
-      name: 'mana Efficiency',
-      description: 'Start each turn with 4 energy instead of 3',
-      class: PlayerClass.WIZARD,
-      effect: 'max_energy_bonus'
+      name: 'Mana Efficiency',
+      description: 'Start each turn with 4 energy instead of 3.',
+      effects: [
+        {
+          code: EffectCode.set_turn_energy,
+          trigger: TriggerPhase.BEFOREDRAW,
+          params: { amount: 4, target: 'player' }
+        }
+      ]
     },
     {
       id: 'wizard_elemental_focus',
-      name: 'elemental Focus',
-      description: 'Every 3rd spell costs 0',
-      class: PlayerClass.WIZARD,
-      effect: 'every_third_spell_free'
+      name: 'Elemental Focus',
+      description: 'Every 3rd spell costs 0.',
+      effects: [
+        {
+          code: EffectCode.every_third_type_free,
+          trigger: TriggerPhase.ONCARDPLAY,
+          params: { count: 3, appliesToTypes: [CardType.SPELL] }
+        }
+      ]
     }
   ]
 };
 
-// Passive abilities for opponents, keyed by opponent id.  These remain
-// unchanged from the original gameData.ts definitions.
-export const opponentPassives: Record<string, OpponentPassive[]> = {
-  wolf: [
-    {
-      id: 'wolf_ambush',
-      name: 'Ambush',
-      description: 'You play first in battle',
-      effect: 'opponent_goes_first'
-    }
-  ],
-  goblin: [
-    {
-      id: 'goblin_coward',
-      name: 'Coward',
-      description: 'When your turn starts, if you have less than 50% health, add a volatile free Cower in your hand.',
-      effect: 'start_of_turn_coward'
-    }
-  ]
-};
+// Opponent-side passives (same Passive type). These were previously defined in the same
+// list; split out for clarity but still use the *same* Passive model and `effects[]`.
+export const opponentPassives: Passive[] = [
+  {
+    id: 'wolf_ambush',
+    name: 'Ambush',
+    description: 'This enemy plays first in battle.',
+    effects: [
+      {
+        code: EffectCode.ambush // used during battle init to set who starts
+      }
+    ]
+  },
+  {
+    id: 'goblin_coward',
+    name: 'Coward',
+    description: 'At the start of its turn, if below 50% health, add a free Volatile Cower to hand.',
+    effects: [
+      {
+        code: EffectCode.add_card_to_hand,
+        trigger: TriggerPhase.BEFOREDRAW,
+        params: {
+          side: 'opponent',
+          // A minimal inline definition; your EFFECTS handler can accept this shape
+          card: {
+            id: 'goblin_cower_volatile_template',
+            name: 'Cower',
+            description: 'Gain 1 Evasive. Volatile.',
+            cost: 0,
+            types: [CardType.SKILL, CardType.VOLATILE],
+            effects: [
+              { code: EffectCode.apply_mod, params: { type: ModType.EVASIVE, stacks: 1, duration: 1, target: 'self' } }
+            ]
+          },
+          condition: { belowHealthPct: 0.5 }
+        }
+      }
+    ]
+  }
+];
 
-// Legacy export kept for backward compatibility.  It contains no entries by
-// default; to add new passives simply append to the structures above.
+// Legacy export kept for backward compatibility (no entries by default)
 export const extraPassives: any[] = [];

@@ -1,4 +1,4 @@
-import { BattleState, Card, CardType, Opponent, Player, StatusType } from '@/types/game';
+import { BattleState, Card, CardType, Opponent, Player, ModType } from '@/types/game';
 
 /**
  * Unified opponent AI for deciding which cards to play each turn.
@@ -46,7 +46,7 @@ export class OpponentAI {
   protected empoweringConditions: Record<string, (state: BattleState, opponent: Opponent, player: Player) => boolean> = {
     // Beast Killing Instinct: deals bonus when the player is bleeding
     'beast_hunters_instinct': (state: BattleState) => {
-      return state.playerStatusEffects.some(effect => effect.type === StatusType.BLEEDING && effect.value > 0);
+      return state.playerStatusEffects.some(effect => effect.type === ModType.BLEEDING && effect.value > 0);
     },
     // Rogue Backstab: highest priority if this is the first card played by the opponent this turn
     'rogue_backstab': (state: BattleState) => {
