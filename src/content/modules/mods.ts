@@ -1,4 +1,5 @@
 import { EffectInstance, EffectCode } from "./effects";
+import { TriggerPhase } from "../../types/game";
 
 export enum ModType {
   BLEEDING = 'bleeding',
@@ -37,10 +38,46 @@ export const MOD_DEFAULT_EFFECTS: Partial<Record<ModType, EffectInstance[]>> = {
     {
       code: EffectCode.deal_damage as any,
       params: { amountFromModStacks: true, target: 'self' },
-      trigger: 'BEFOREDRAW' as any,
+      trigger: TriggerPhase.BEFOREDRAW,
+    },
+  ],
+  [ModType.VULNERABLE]: [
+    {
+      code: EffectCode.damage_mod as any,
+      params: { amount: 50 }, // e.g. +50% incoming damage
+      trigger: TriggerPhase.ONDAMAGEINCOMING,
+    },
+  ],
+  [ModType.WEAK]: [
+    {
+      code: EffectCode.damage_mod as any,
+      params: { amount: -25 }, // e.g. -25% outgoing damage
+      trigger: TriggerPhase.ONDAMAGEDEALING,
+    },
+  ],
+  [ModType.EVASIVE]: [
+    {
+      code: EffectCode.evade as any,
+      params: { consumeStack: true },
+      trigger: TriggerPhase.ONDAMAGEINCOMING,
+    },
+  ],
+  [ModType.STRENGTH]: [
+    {
+      code: EffectCode.damage_mod as any,
+      params: { amountFromModStacks: true },
+      trigger: TriggerPhase.ONDAMAGEDEALING,
+    },
+  ],
+  [ModType.DEXTERITY]: [
+    {
+      code: EffectCode.block_mod as any,
+      params: { amountFromModStacks: true },
+      trigger: TriggerPhase.ONDAMAGEINCOMING,
     },
   ],
 };
+
 export interface ActiveMod {
   type: ModType; // e.g., BLEEDING, EVASIVE, HANDHEX, …
   stacks: number; // how many stacks (always clamped by MOD_DEFS.maxStacks)

@@ -19,6 +19,8 @@ export enum TriggerPhase {
   STARTOFTURN = 'startOfTurn',
   ONCARDRAW = 'onCardDraw',
   ONCARDPLAY = 'onCardPlay',
+  ONDAMAGEDEALING = 'onDamageDealing',
+  ONDAMAGEINCOMING = 'onDamageIncoming',
   ONTARGET = 'onTargetSelected',
   ENDOFTURN = 'endOfTurn'
 };

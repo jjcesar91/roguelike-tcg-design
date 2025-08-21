@@ -22,6 +22,11 @@ export enum EffectCode {
     damage_status_mod = 'damage_status_mod',
     draw_mod = 'draw_mod',
 
+    // ---- Damage/block/evade related effects ----
+    damage_mod = 'damage_mod',
+    block_mod = 'block_mod',
+    evade = 'evade',
+
     // ---- Passive-related effects ----
     damage_bonus_low_health = 'damage_bonus_low_health',
     block_bonus_flat = 'block_bonus_flat',
@@ -42,7 +47,8 @@ export interface EffectInstance {
 }
 // ------------------------------------------------------------------------------------
 
-import { formatLogText, applyMod, consumeModStacks, resolveAndApplyDamage } from "@/lib/gameUtils";
+import { formatLogText, applyMod, resolveAndApplyDamage } from "@/lib/gameUtils";
+import { consumeModStacks } from '@/logic/core/StatusManager';
 import { Card, DrawModType, CardType, BattleState, Opponent, Player, TriggerPhase } from "@/types/game";
 import { ModType } from "./mods";
 
@@ -164,30 +170,97 @@ const EFFECTS: Record<EffectCode, (ctx: EffectContext, params?: any) => void> = 
 
   // Deal direct damage to player or opponent (delegates to unified routine)
   deal_damage: (ctx, params) => {
-  const { state, side, log, opponent, player, sourceCard } = ctx;
-  const amount: number = params?.amount ?? 0;
-  const explicitTarget: 'player' | 'opponent' | undefined = params?.target;
-  if (amount <= 0) return;
+    const { state, side, log, opponent, player, sourceCard } = ctx;
+    const amount: number = params?.amount ?? 0;
+    const explicitTarget: 'player' | 'opponent' | undefined = params?.target;
+    if (amount <= 0) return;
 
-  // The resolver always applies damage to the opposite of `side`.
-  // If an effect explicitly targets the same side (self-damage/friendly fire),
-  // flip the side so the resolver will hit the intended target.
-  const defaultTarget: 'player' | 'opponent' = side === 'player' ? 'opponent' : 'player';
-  const intendedTarget: 'player' | 'opponent' = explicitTarget ?? defaultTarget;
-  const effectiveSide: 'player' | 'opponent' =
-    intendedTarget === defaultTarget ? side : (side === 'player' ? 'opponent' : 'player');
+    // The resolver always applies damage to the opposite of `side`.
+    // If an effect explicitly targets the same side (self-damage/friendly fire),
+    // flip the side so the resolver will hit the intended target.
+    const defaultTarget: 'player' | 'opponent' = side === 'player' ? 'opponent' : 'player';
+    const intendedTarget: 'player' | 'opponent' = explicitTarget ?? defaultTarget;
+    const effectiveSide: 'player' | 'opponent' =
+      intendedTarget === defaultTarget ? side : (side === 'player' ? 'opponent' : 'player');
 
-  resolveAndApplyDamage({
-    side: effectiveSide,
-    source: 'effect',
-    baseDamage: amount,
-    card: sourceCard,
-    state,
-    player,
-    opponent,
-    log,
-  });
-},
+    resolveAndApplyDamage({
+      side: effectiveSide,
+      source: 'effect',
+      baseDamage: amount,
+      card: sourceCard,
+      state,
+      player,
+      opponent,
+      log,
+    });
+  },
+
+  // Generic damage modifier: supports flat and percent adjustments.
+  // Use with TriggerPhase.ONDAMAGEDEALING (outgoing) or ONDAMAGEINCOMING (incoming).
+  damage_mod: (ctx, params) => {
+    const { sourceCard } = ctx;
+    if (!sourceCard) return;
+    const flat: number = params?.amount ?? 0; // flat add/subtract
+    const percent: number = params?.percent ?? 0; // +/- percent, e.g., +50 => x1.5, -25 => x0.75
+
+    // Percent first, then flat for deterministic stacking
+    if (typeof sourceCard.attack === 'number') {
+      let atk = sourceCard.attack || 0;
+      if (percent) {
+        atk = Math.floor(atk * (1 + percent / 100));
+      }
+      if (flat) {
+        atk = atk + flat;
+      }
+      sourceCard.attack = Math.max(0, atk);
+    }
+  },
+
+  // Add (or reduce) block immediately on the chosen target. Useful for ONDAMAGEINCOMING.
+  // Params: { amount: number, target?: 'self'|'opponent' }
+  block_mod: (ctx, params) => {
+    const { state, side, player, opponent, log } = ctx;
+    const amount: number = params?.amount ?? 0;
+    if (!amount) return;
+
+    // Resolve target side relative to the owner of the effect
+    const t: 'player' | 'opponent' = (params?.target === 'opponent')
+      ? (side === 'player' ? 'opponent' : 'player')
+      : side; // default 'self'
+
+    if (t === 'player') {
+      state.playerBlock = Math.max(0, (state.playerBlock || 0) + amount);
+      log.push(formatLogText(`Player ${amount >= 0 ? 'gains' : 'loses'} ${Math.abs(amount)} block`, player.class, opponent.name, ctx.sourceCard?.name));
+    } else {
+      state.opponentBlock = Math.max(0, (state.opponentBlock || 0) + amount);
+      log.push(formatLogText(`${opponent.name} ${amount >= 0 ? 'gains' : 'loses'} ${Math.abs(amount)} block`, player.class, opponent.name, ctx.sourceCard?.name));
+    }
+  },
+
+  // Evade current incoming damage by zeroing the attack; optionally consume 1 EVASIVE stack.
+  // Use with TriggerPhase.ONDAMAGEINCOMING.
+  // Params: { consumeStack?: boolean, target?: 'self'|'opponent' }
+  evade: (ctx, params) => {
+    const { state, side, player, opponent, log } = ctx;
+    if (typeof ctx.sourceCard?.attack === 'number') {
+      ctx.sourceCard.attack = 0;
+    }
+
+    const consume: boolean = !!params?.consumeStack;
+    const t: 'player' | 'opponent' = (params?.target === 'opponent')
+      ? (side === 'player' ? 'opponent' : 'player')
+      : side; // default 'self'
+
+    if (consume) {
+      if (t === 'player') {
+        state.playerMods = consumeModStacks(state.playerMods || [], ModType.EVASIVE, 1);
+      } else {
+        state.opponentMods = consumeModStacks(state.opponentMods || [], ModType.EVASIVE, 1);
+      }
+    }
+
+    log.push(formatLogText(`${t === 'player' ? 'Player' : opponent.name} evaded the hit`, player.class, opponent.name, ctx.sourceCard?.name));
+  },
 
   damage_status_mod: (ctx, params) => {
     const { state, side, sourceCard } = ctx;

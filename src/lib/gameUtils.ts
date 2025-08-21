@@ -6,6 +6,7 @@ import { EffectInstance } from "@/content/modules/effects";
 import { EffectCode } from "@/content/modules/effects";
 import * as gameData from '@/data/gameData';
 import { runCardEffects } from '@/content/modules/effects';
+import { consumeModStacks } from '@/logic/core/StatusManager';
 
 
 dbg('gameUtils.ts loaded');
@@ -314,36 +315,86 @@ export function calculateDamageWithStatusEffects(
   damage: number,
   attackerMods: ActiveMod[],
   defenderMods: ActiveMod[],
-  card?: Card
-): { finalDamage: number; evaded: boolean; consumeEvasive: boolean } {
-  let finalDamage = damage;
-  let evaded = false;
-  let consumeEvasive = false;
+  ctx: {
+    card?: Card;
+    state: BattleState;
+    player: Player;
+    opponent: Opponent;
+    side: 'player' | 'opponent';
+    log?: string[];
+  }
+): { finalDamage: number; evaded: boolean; consumedEvasive: boolean } {
+  const { card, state, player, opponent, side, log } = ctx;
 
-  const isAttackCard = !!card && (card.types?.includes(CardType.MELEE) || card.types?.includes(CardType.ATTACK));
+  // 1) Build a single pseudo card that carries the working damage value.
+  //    All onDamageDealing / onDamageIncoming effects will mutate this `attack`.
+  const pseudo: Card & { effects: EffectInstance[] } = {
+    id: `dmg:${Date.now()}`,
+    name: '[Damage Pipeline]',
+    description: '',
+    cost: 0,
+    class: player.class,
+    rarity: Rarity.COMMON,
+    types: card?.types ? [...(card.types || [])] : [],
+    attack: Math.max(0, damage),
+    effects: [],
+  };
 
-  const evasive = defenderMods.find(m => m.type === ModType.EVASIVE && m.stacks > 0);
-  if (isAttackCard && evasive && finalDamage > 0) {
-    evaded = true;
-    finalDamage = 0;
-    consumeEvasive = true;
+  // Helpers to collect effects from passives/mods for a specific side & phase
+  const collectPassiveEffects = (owner: 'player' | 'opponent', phase: TriggerPhase): EffectInstance[] => {
+    const list = (owner === 'player' ? player.passives : opponent.passives) || [];
+    return list.flatMap(p => (p.effects || []).filter(e => e.trigger === phase));
+  };
+
+  const collectModEffects = (owner: 'player' | 'opponent', phase: TriggerPhase): EffectInstance[] => {
+    const mods = owner === 'player' ? (state.playerMods || []) : (state.opponentMods || []);
+    const out: EffectInstance[] = [];
+    for (const m of mods) {
+      for (const eff of (m.effects || [])) {
+        if (eff.trigger !== phase) continue;
+        // Normalize params relative to owner side (self/opponent & stack-derivation)
+        const params = resolveModEffectParams(eff.params, m, owner);
+        out.push({ ...eff, params });
+      }
+    }
+    return out;
+  };
+
+  // 2) Gather effects in the correct order:
+  //    a) Attacker ONDAMAGEDEALING (passives + mods)
+  //    b) Defender ONDAMAGEINCOMING (passives + mods)
+  const dealingEffects: EffectInstance[] = [
+    ...collectPassiveEffects(side, TriggerPhase.ONDAMAGEDEALING),
+    ...collectModEffects(side, TriggerPhase.ONDAMAGEDEALING),
+  ];
+
+  const defenderSide: 'player' | 'opponent' = side === 'player' ? 'opponent' : 'player';
+  const incomingEffects: EffectInstance[] = [
+    ...collectPassiveEffects(defenderSide, TriggerPhase.ONDAMAGEINCOMING),
+    ...collectModEffects(defenderSide, TriggerPhase.ONDAMAGEINCOMING),
+  ];
+
+  // 3) Run effects over the single pseudo card so they can mutate `attack`.
+  //    We run in two passes to preserve intuitive ordering.
+  if (dealingEffects.length) {
+    pseudo.effects = dealingEffects.map(e => ({ ...e }));
+    runCardEffects(pseudo, { side, player, opponent, state, log: log || [] }, log || []);
   }
 
-  if (!evaded) {
-    const weak = attackerMods.find(m => m.type === ModType.WEAK && m.stacks > 0);
-    if (weak && isAttackCard) finalDamage = Math.floor(finalDamage * 0.5);
-
-    const vulnerable = defenderMods.find(m => m.type === ModType.VULNERABLE && m.stacks > 0);
-    if (vulnerable) finalDamage = Math.floor(finalDamage * 1.5);
-
-    const strength = attackerMods.find(m => m.type === ModType.STRENGTH && m.stacks > 0);
-    if (strength) finalDamage += strength.stacks * 3;
-
-    const bleeding = attackerMods.find(m => m.type === ModType.BLEEDING && m.stacks > 0);
-    if (bleeding) finalDamage = Math.max(0, finalDamage - bleeding.stacks);
+  if (incomingEffects.length) {
+    pseudo.effects = incomingEffects.map(e => ({ ...e }));
+    // Note: for incoming we still use the attacker's `side` in context so handlers can
+    // resolve targets relative to the same action; targeting inside params was already
+    // normalized for mods via resolveModEffectParams.
+    runCardEffects(pseudo, { side, player, opponent, state, log: log || [] }, log || []);
   }
 
-  return { finalDamage: Math.max(0, finalDamage), evaded, consumeEvasive };
+  // 4) Finalize
+  const final = Math.max(0, pseudo.attack || 0);
+  const evaded = final === 0; // any ONDAMAGEINCOMING effect (e.g., `evade`) can zero the hit
+
+  // We let resolveAndApplyDamage handle Evasive stack consumption consistently to avoid double-consume.
+  return { finalDamage: final, evaded, consumedEvasive: false };
 }
 
 /**
@@ -403,12 +454,12 @@ export function resolveAndApplyDamage(opts: {
   const attackerMods = isPlayer ? (state.playerMods || []) : (state.opponentMods || []);
   const defenderMods = isPlayer ? (state.opponentMods || []) : (state.playerMods || []);
 
-  // Compute pre-block damage considering mods (weak/vulnerable/strength/evasive/bleeding)
-  const { finalDamage, evaded, consumeEvasive } = calculateDamageWithStatusEffects(
+  // Compute pre-block damage considering mods, passives, etc.
+  const { finalDamage, evaded, consumedEvasive } = calculateDamageWithStatusEffects(
     baseDamage,
     attackerMods,
     defenderMods,
-    card
+    { card, state, player, opponent, side, log }
   );
 
   // If evaded, consume a stack and log
@@ -427,7 +478,7 @@ export function resolveAndApplyDamage(opts: {
       dealt: 0,
       blocked: 0,
       evaded: true,
-      consumedEvasive: consumeEvasive,
+      consumedEvasive: consumedEvasive,
       brokeBlock: false
     };
   }
@@ -530,22 +581,6 @@ export function tickMods(mods: ActiveMod[]): ActiveMod[] {
     .map(m => ({ ...m, duration: Math.max(0, m.duration - 1) }))
     .filter(m => m.duration > 0 && m.stacks > 0);
 }
-
-// Consume stacks of a mod (e.g., EVASIVE):
-export function consumeModStacks(mods: ActiveMod[], type: ModType, amount = 1): ActiveMod[] {
-  const i = mods.findIndex(m => m.type === type);
-  if (i < 0) return mods;
-  const next = [...mods];
-  const m = next[i];
-  const stacks = Math.max(0, m.stacks - amount);
-  if (stacks === 0) {
-    next.splice(i, 1); // remove when consumed fully
-  } else {
-    next[i] = { ...m, stacks };
-  }
-  return next;
-}
-
 
 export function shuffleCardsIntoDeck(deck: Deck, cardsToAdd: Card[]): Deck {
   // Create a new deck with the additional cards shuffled in

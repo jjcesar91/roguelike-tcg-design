@@ -14,7 +14,7 @@ export const passives: Record<PlayerClass, Passive[]> = {
       effects: [
         {
           code: EffectCode.damage_bonus_low_health,
-          trigger: TriggerPhase.ONCARDPLAY,
+          trigger: TriggerPhase.ONDAMAGEDEALING,
           params: {
             threshold: 0.5,
             bonus: 2,
@@ -89,7 +89,7 @@ export const passives: Record<PlayerClass, Passive[]> = {
       effects: [
         {
           code: EffectCode.damage_bonus_by_type,
-          trigger: TriggerPhase.ONCARDPLAY,
+          trigger: TriggerPhase.ONDAMAGEDEALING,
           params: {
             bonus: 3,
             appliesToTypes: [CardType.SPELL]

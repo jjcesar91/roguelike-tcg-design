@@ -1,5 +1,5 @@
 import { ModType } from "@/content/modules/mods";
-import type { ActiveMod as StatusEffect } from "@/content/modules/mods";
+import type { ActiveMod, ActiveMod as StatusEffect } from "@/content/modules/mods";
 
 /**
  * Centralized status logic: stacking, duration, consume events.
@@ -81,3 +81,19 @@ export default class StatusManager {
     return next;
   }
 }
+// Consume stacks of a mod (e.g., EVASIVE):
+
+export function consumeModStacks(mods: ActiveMod[], type: ModType, amount = 1): ActiveMod[] {
+  const i = mods.findIndex(m => m.type === type);
+  if (i < 0) return mods;
+  const next = [...mods];
+  const m = next[i];
+  const stacks = Math.max(0, m.stacks - amount);
+  if (stacks === 0) {
+    next.splice(i, 1); // remove when consumed fully
+  } else {
+    next[i] = { ...m, stacks };
+  }
+  return next;
+}
+
