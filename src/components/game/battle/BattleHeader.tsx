@@ -17,6 +17,9 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
   opponent,
   battleState
 }) => {
+  const [playerPortraitError, setPlayerPortraitError] = React.useState(false);
+  const [opponentPortraitError, setOpponentPortraitError] = React.useState(false);
+
   const playerClassData = playerClasses[player.class];
   const PlayerIcon = playerClassData.icon;
 
@@ -27,16 +30,18 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
         {/* Player Portrait */}
         <div className="mb-3">
           <div className="w-20 h-20 rounded-lg overflow-hidden bg-amber-50 flex items-center justify-center border-2 border-amber-200">
-            <img 
-              src={playerClassData.portrait} 
-              alt={`${playerClassData.name} Portrait`} 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                target.parentElement!.innerHTML = `<div class="w-full h-full flex items-center justify-center text-gray-400"><PlayerIcon className="w-10 h-10" /></div>`;
-              }}
-            />
+            {!playerPortraitError ? (
+              <img
+                src={playerClassData.portrait}
+                alt={`${playerClassData.name} Portrait`}
+                className="w-full h-full object-cover"
+                onError={() => setPlayerPortraitError(true)}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <PlayerIcon className="w-10 h-10" />
+              </div>
+            )}
           </div>
         </div>
         <div className="font-semibold card-title text-lg flex items-center gap-2 mb-2">
@@ -56,12 +61,12 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
           </div>
         )}
         <StatusEffects 
-          effects={battleState.playerStatusEffects} 
+          effects={battleState.playerMods} 
           isOpponent={false}
         />
         <div className="flex items-center gap-1 mt-2">
           {Array.from({ length: battleState.playerEnergy }, (_, i) => (
-            <div key={i} className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+            <div key={`eng-${i}`} className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
               <Diamond className="w-2 h-2 text-white" />
             </div>
           ))}
@@ -80,16 +85,18 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
         {/* Opponent Portrait */}
         <div className="mb-3">
           <div className="w-20 h-20 rounded-lg overflow-hidden bg-amber-50 flex items-center justify-center border-2 border-amber-200 ml-auto">
-            <img 
-              src={opponent.portrait} 
-              alt={`${opponent.name} Portrait`} 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400"><Skull className="w-10 h-10" /></div>';
-              }}
-            />
+            {!opponentPortraitError ? (
+              <img
+                src={opponent.portrait}
+                alt={`${opponent.name} Portrait`}
+                className="w-full h-full object-cover"
+                onError={() => setOpponentPortraitError(true)}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <Skull className="w-10 h-10" />
+              </div>
+            )}
           </div>
         </div>
         <div className="font-semibold card-title text-lg flex items-center justify-end gap-2 mb-2">
@@ -108,7 +115,7 @@ export const BattleHeader: React.FC<BattleHeaderProps> = ({
           </div>
         )}
         <StatusEffects 
-          effects={battleState.opponentStatusEffects} 
+          effects={battleState.opponentMods} 
           isOpponent={true}
         />
       </div>

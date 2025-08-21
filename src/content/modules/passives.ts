@@ -126,8 +126,8 @@ export const passives: Record<PlayerClass, Passive[]> = {
 
 // Opponent-side passives (same Passive type). These were previously defined in the same
 // list; split out for clarity but still use the *same* Passive model and `effects[]`.
-export const opponentPassives: Passive[] = [
-  {
+export const opponentPassives: Record<string, Passive> = {
+  wolf_ambush: {
     id: 'wolf_ambush',
     name: 'Ambush',
     description: 'This enemy plays first in battle.',
@@ -137,7 +137,7 @@ export const opponentPassives: Passive[] = [
       }
     ]
   },
-  {
+  goblin_coward: {
     id: 'goblin_coward',
     name: 'Coward',
     description: 'At the start of its turn, if below 50% health, add a free Volatile Cower to hand.',
@@ -163,7 +163,7 @@ export const opponentPassives: Passive[] = [
       }
     ]
   }
-];
+};
 
 // Legacy export kept for backward compatibility (no entries by default)
 export const extraPassives: any[] = [];

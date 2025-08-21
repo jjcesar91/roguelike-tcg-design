@@ -33,7 +33,7 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 2,
       attack: 8,
       effects: [
-        { code: EffectCode.apply_status, params: { target: 'opponent', status: 'vulnerable', amount: 2 } }
+        { code: EffectCode.apply_mod, params: { target: 'opponent', type: ModType.VULNERABLE, stacks: 2 } }
       ],
       class: PlayerClass.WARRIOR,
       rarity: Rarity.COMMON,
@@ -104,10 +104,10 @@ export const playerCards: Record<PlayerClass, Card[]> = {
     {
       id: 'rogue_poison',
       name: 'Poison',
-      description: 'Apply 3 poison',
+      description: 'Apply 3 bleeding',
       cost: 1,
       effects: [
-        { code: EffectCode.apply_status, params: { target: 'opponent', status: 'poison', amount: 3 } }
+        { code: EffectCode.apply_mod, params: { target: 'opponent', type: ModType.BLEEDING, stacks: 3 } }
       ],
       class: PlayerClass.ROGUE,
       rarity: Rarity.RARE,
@@ -185,7 +185,7 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 2,
       defense: 10,
       effects: [
-        { code: EffectCode.apply_status, params: { target: 'opponent', status: 'frozen', amount: 1 } }
+        { code: EffectCode.apply_mod, params: { target: 'opponent', type: ModType.WEAK, stacks: 1 } }
       ],
       class: PlayerClass.WIZARD,
       rarity: Rarity.RARE,
@@ -225,7 +225,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       cost: 1,
       attack: 5,
       effects: [
-        { code: EffectCode.apply_status, params: { target: 'player', status: 'bleed', amount: 2 } }
+        { code: EffectCode.apply_mod, params: { target: 'player', type: ModType.BLEEDING, stacks: 2 } }
       ],
       class: OpponentType.BEAST,
       rarity: Rarity.COMMON,
@@ -237,7 +237,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Apply 2 weak to player',
       cost: 2,
       effects: [
-        { code: EffectCode.apply_status, params: { target: 'player', status: 'weak', amount: 2 } }
+        { code: EffectCode.apply_mod, params: { target: 'player', type: ModType.WEAK, stacks: 2 } }
       ],
       class: OpponentType.BEAST,
       rarity: Rarity.RARE,
@@ -365,7 +365,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Gain 1 Evasive',
       cost: 2,
       effects: [
-        { code: EffectCode.gain_evasive_self, params: { amount: 1 } }
+        { code: EffectCode.apply_mod, params: { target: 'self', type: ModType.EVASIVE, stacks: 1 } }
       ],
       class: OpponentType.MONSTER,
       rarity: Rarity.COMMON,
@@ -387,7 +387,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Gain 1 Evasive. Volatile.',
       cost: 2,
       effects: [
-        { code: EffectCode.gain_evasive_self, params: { amount: 1 } }
+        { code: EffectCode.apply_mod, params: { target: 'self', type: ModType.EVASIVE, stacks: 1 } }
       ],
       class: OpponentType.MONSTER,
       rarity: Rarity.COMMON,
@@ -411,7 +411,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Apply 3 poison',
       cost: 2,
       effects: [
-        { code: EffectCode.apply_status, params: { target: 'player', status: 'poison', amount: 3 } }
+        { code: EffectCode.apply_mod, params: { target: 'player', type: ModType.BLEEDING, stacks: 3 } }
       ],
       class: OpponentType.UNDEAD,
       rarity: Rarity.COMMON,

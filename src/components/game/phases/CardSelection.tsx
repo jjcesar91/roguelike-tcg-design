@@ -53,9 +53,9 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
       <div>
         <h3 className="text-lg font-semibold card-title mb-4">Available Cards</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {availableCards.map((card, index) => (
+          {availableCards.map((card) => (
             <CardComponent 
-              key={index} 
+              key={card.id || undefined} 
               className={`cursor-pointer hover:shadow-md transition-all custom-hover ${
                 selectedCard === card.id ? 'ring-2 ring-primary scale-105' : ''
               } ${isModalOpen ? 'opacity-50' : ''}`}
@@ -80,9 +80,16 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-sm mb-3">{card.description}</CardDescription>
-                {card.effect && (
-                  <div className="text-xs text-muted-foreground italic">
-                    Effect: {card.effect}
+                {Array.isArray((card as any).effects) && (card as any).effects.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <div className="text-xs font-semibold">Effects</div>
+                    <div className="flex flex-wrap gap-1">
+                      {((card as any).effects as any[]).map((e, i) => (
+                        <Badge key={i} variant="outline" className="text-[10px]">
+                          {String(e.code)}{e.trigger ? ` · ${String(e.trigger)}` : ''}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -99,9 +106,9 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
             Select one of your current cards to replace. All 3 copies will be removed.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {uniqueCards.map((card, index) => (
+            {uniqueCards.map((card) => (
               <CardComponent 
-                key={index} 
+                key={card.id || undefined} 
                 className={`cursor-pointer hover:shadow-md transition-all custom-hover ${
                   selectedReplaceCard === card.id ? 'ring-2 ring-destructive scale-105' : ''
                 } ${isModalOpen ? 'opacity-50' : ''}`}
@@ -121,9 +128,16 @@ export const CardSelection: React.FC<CardSelectionProps> = ({
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="text-sm mb-3">{card.description}</CardDescription>
-                  {card.effect && (
-                    <div className="text-xs text-muted-foreground italic">
-                      Effect: {card.effect}
+                  {Array.isArray((card as any).effects) && (card as any).effects.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <div className="text-xs font-semibold">Effects</div>
+                      <div className="flex flex-wrap gap-1">
+                        {((card as any).effects as any[]).map((e, i) => (
+                          <Badge key={i} variant="outline" className="text-[10px]">
+                            {String(e.code)}{e.trigger ? ` · ${String(e.trigger)}` : ''}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </CardContent>

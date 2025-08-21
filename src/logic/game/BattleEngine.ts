@@ -1,4 +1,5 @@
 import { Card, PlayerClass } from '@/types/game'
+import { EffectCode } from '../../content/modules/effects'
 import { opponents as allOpponents, playerCards, playerClasses } from '@/data/gameData'
 import Character from '../core/Character'
 
@@ -47,8 +48,10 @@ export class BattleEngine {
       passives: baseOpp.passives ? [baseOpp.passives as any] : []
     })
 
-    // Determine first turn (simple ambush check by passive id/effect)
-    const ambush = Array.isArray(baseOpp.passives) && baseOpp.passives.some(p => p.effect === 'opponent_goes_first')
+    // Determine first turn (ambush check by passive effect code)
+    const ambush =
+      Array.isArray(baseOpp.passives) &&
+      baseOpp.passives.some(p => p.effects?.some(e => e.code === EffectCode.ambush));
     const engine = new BattleEngine(player, opponent, ambush ? 'opponent' : 'player')
 
     if (engine.turn === 'player') {

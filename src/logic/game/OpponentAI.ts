@@ -47,7 +47,7 @@ export class OpponentAI {
   protected empoweringConditions: Record<string, (state: BattleState, opponent: Opponent, player: Player) => boolean> = {
     // Beast Killing Instinct: deals bonus when the player is bleeding
     'beast_hunters_instinct': (state: BattleState) => {
-      return state.playerStatusEffects.some(effect => effect.type === ModType.BLEEDING && effect.value > 0);
+      return Array.isArray(state.playerMods) && state.playerMods.some(m => m.type === ModType.BLEEDING && m.stacks > 0);
     },
     // Rogue Backstab: highest priority if this is the first card played by the opponent this turn
     'rogue_backstab': (state: BattleState) => {
@@ -55,9 +55,11 @@ export class OpponentAI {
     },
     // Wizard Arcane Power: prioritise if opponent has spell cards in hand (by effect containing 'spell')
     'wizard_arcane_power': (state: BattleState, opponent: Opponent) => {
-      return state.opponentHand.some(c => {
-        const hasSpellEffect = c.effect?.toLowerCase().includes('spell');
-        return hasSpellEffect;
+      return state.opponentHand.some((c: Card) => {
+        // Prefer a dedicated SPELL card type if present; otherwise fallback to checking effects metadata.
+        const isSpellType = Array.isArray(c.types) && (c.types as CardType[]).includes(CardType.SPELL as any);
+        const hasStructuredEffects = Array.isArray((c as any).effects) && (c as any).effects.length > 0;
+        return !!isSpellType || !!hasStructuredEffects;
       });
     }
   };
@@ -133,7 +135,7 @@ export class OpponentAI {
   protected cardPriority(card: Card): number {
     const types = card.types || [];
     const isAttack = types.includes(CardType.ATTACK);
-    const hasEffect = !!card.effect && card.effect.trim().length > 0;
+    const hasEffect = Array.isArray((card as any).effects) && (card as any).effects.length > 0;
     if (!isAttack) return 3;        // Non‑attack cards (skills, powers) highest priority
     if (hasEffect) return 2;        // Attack cards with effects next
     return 1;                       // Plain attack cards lowest

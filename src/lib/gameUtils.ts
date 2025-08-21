@@ -682,14 +682,14 @@ function runTriggeredEffectsForPhase(
   opponent: Opponent,
   log: string[],
 ) {
-  const playerPassives = Array.isArray(player.passives) ? player.passives : [];
-  const opponentPassives = Array.isArray(opponent.passives) ? opponent.passives : [];
+  const playerSidePassives = Array.isArray(player.passives) ? player.passives : [];
+  const opponentSidePassives = Array.isArray(opponent.passives) ? opponent.passives : [];
 
   const pick = (effects?: EffectInstance[]) => (effects || []).filter(e => e.trigger === phase);
 
   const bundles: EffectInstance[] = [
-    ...playerPassives.flatMap(p => pick(p.effects)),
-    ...opponentPassives.flatMap(p => pick(p.effects)),
+    ...playerSidePassives.flatMap(p => pick(p.effects)),
+    ...opponentSidePassives.flatMap(p => pick(p.effects)),
   ];
 
   for (const eff of bundles) {

@@ -1,4 +1,4 @@
-import { Opponent } from '@/types/game';
+import { Opponent, OpponentType, Difficulty } from '@/types/game';
 import { opponentCards } from './cards';
 import { opponentPassives } from './passives';
 
@@ -9,7 +9,7 @@ export const opponents: Opponent[] = [
   {
     id: 'goblin',
     name: 'goblin Hunter',
-    type: 'monster',
+    type: OpponentType.MONSTER,
     health: 30,
     maxHealth: 30,
     portrait: "https://i.imgur.com/tN5et02.jpeg",
@@ -28,13 +28,13 @@ export const opponents: Opponent[] = [
       ],
       discardPile: []
     },
-    passive: opponentPassives.goblin[0],
-    difficulty: 'basic'
+    passives: [opponentPassives.goblin_coward],
+    difficulty: Difficulty.BASIC
   },
   {
     id: 'wolf',
     name: 'Alpha Wolf',
-    type: 'beast',
+    type: OpponentType.BEAST,
     health: 42,
     maxHealth: 42,
     portrait: "https://i.imgur.com/0TFnwFH.png",
@@ -53,13 +53,13 @@ export const opponents: Opponent[] = [
       ],
       discardPile: []
     },
-    passive: opponentPassives.wolf[0],
-    difficulty: 'basic'
+    passives: [opponentPassives.wolf_ambush],
+    difficulty: Difficulty.BASIC
   },
   {
     id: 'skeleton',
     name: 'skeleton Lord',
-    type: 'undead',
+    type: OpponentType.UNDEAD,
     health: 40,
     maxHealth: 40,
     portrait: "https://i.imgur.com/E36FymH.jpeg",
@@ -70,12 +70,13 @@ export const opponents: Opponent[] = [
       ],
       discardPile: []
     },
-    difficulty: 'medium'
+    passives: [],
+    difficulty: Difficulty.MEDIUM
   },
   {
     id: 'bandit',
     name: 'bandit Leader',
-    type: 'rogue',
+    type: OpponentType.ROGUE,
     health: 45,
     maxHealth: 45,
     portrait: "https://i.imgur.com/dXzCZbO.jpeg",
@@ -86,12 +87,13 @@ export const opponents: Opponent[] = [
       ],
       discardPile: []
     },
-    difficulty: 'medium'
+    passives: [],
+    difficulty: Difficulty.MEDIUM
   },
   {
     id: 'dragon',
     name: 'ancient Dragon',
-    type: 'monster',
+    type: OpponentType.MONSTER,
     health: 60,
     maxHealth: 60,
     portrait: "https://i.imgur.com/BM04nJa.png",
@@ -102,12 +104,13 @@ export const opponents: Opponent[] = [
       ],
       discardPile: []
     },
-    difficulty: 'boss'
+    passives: [],
+    difficulty: Difficulty.BOSS
   },
   {
     id: 'lich',
     name: 'lich King',
-    type: 'undead',
+    type: OpponentType.UNDEAD,
     health: 65,
     maxHealth: 65,
     portrait: "https://i.imgur.com/P1VfO0A.jpeg",
@@ -118,7 +121,8 @@ export const opponents: Opponent[] = [
       ],
       discardPile: []
     },
-    difficulty: 'boss'
+    passives: [],
+    difficulty: Difficulty.BOSS
   }
 ];
 

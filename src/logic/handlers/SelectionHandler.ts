@@ -1,5 +1,5 @@
 import { dbg } from '@/lib/debug';
-import { Card, Player } from '@/types/game';
+import { Card, Player, Difficulty } from '@/types/game';
 import { replaceCardInDeck, getRandomOpponent, initializeBattle, drawCardsWithReshuffle, getRandomCards } from '@/lib/gameUtils';
 
 export class SelectionHandler {
@@ -7,13 +7,13 @@ export class SelectionHandler {
     const newPlayer = replaceCardInDeck(player, replaceCardId, card);
     
     // Get next opponent based on the current player level (from game state, not newPlayer)
-    let difficulty: 'basic' | 'medium' | 'boss';
+    let difficulty: Difficulty;
     if (player.level === 2) {
-      difficulty = 'medium';      // After beating level 1 (now level 2), fight medium opponent
+      difficulty = Difficulty.MEDIUM;      // After beating level 1 (now level 2), fight medium opponent
     } else if (player.level === 3) {
-      difficulty = 'boss';        // After beating level 2 (now level 3), fight boss opponent
+      difficulty = Difficulty.BOSS;        // After beating level 2 (now level 3), fight boss opponent
     } else {
-      difficulty = 'boss';        // fallback
+      difficulty = Difficulty.BOSS;        // fallback
     }
     
     dbg(`Player level: ${player.level}, selecting opponent difficulty: ${difficulty}`);
