@@ -1,4 +1,6 @@
-import { Card, PlayerClass, OpponentType, CardType, Rarity, EffectCode, ModType } from '@/types/game';
+import { Card, PlayerClass, OpponentType, CardType, Rarity } from '@/types/game';
+import { ModType } from "./mods";
+import { EffectCode } from "./effects";
 
 // Base card definitions for each player class.  Adding new cards is as simple
 // as appending to the appropriate array here.

@@ -1,3 +1,6 @@
+import { EffectInstance } from "@/content/modules/effects";
+import { ActiveMod } from "@/content/modules/mods";
+
 export enum CardType {
   MELEE = 'melee',
   ATTACK = 'attack',
@@ -11,30 +14,6 @@ export enum CardType {
   SPELL = 'spell',
 }
 
-export enum ModType {
-  BLEEDING = 'bleeding',
-  DEXTERITY = 'dexterity',
-  EVASIVE = 'evasive',
-  STRENGTH = 'strength',
-  VULNERABLE = 'vulnerable',
-  WEAK = 'weak',
-  HANDHEX = 'handhex'
-}
-
-export const MOD_DEFS: Record<ModType, {
-  maxStacks: number;
-  defaultDuration: number;   // applyMod can use this if caller omits duration
-  stackMode: 'add' | 'replace'; // how stacks behave on reapply
-}> = {
-  [ModType.BLEEDING]:  { maxStacks: 5, defaultDuration: 2, stackMode: 'add' },
-  [ModType.EVASIVE]:   { maxStacks: 3, defaultDuration: 2, stackMode: 'add' },
-  [ModType.WEAK]:      { maxStacks: 1, defaultDuration: 2, stackMode: 'replace' },
-  [ModType.VULNERABLE]:{ maxStacks: 1, defaultDuration: 2, stackMode: 'replace' },
-  [ModType.STRENGTH]:  { maxStacks: 99, defaultDuration: 2, stackMode: 'add' },
-  [ModType.DEXTERITY]: { maxStacks: 99, defaultDuration: 2, stackMode: 'add' },
-  [ModType.HANDHEX]:   { maxStacks: 99, defaultDuration: 1, stackMode: 'add' },
-};
-
 export enum TriggerPhase {
   BEFOREDRAW = 'beforeDraw',
   STARTOFTURN = 'startOfTurn',
@@ -43,47 +22,6 @@ export enum TriggerPhase {
   ONTARGET = 'onTargetSelected',
   ENDOFTURN = 'endOfTurn'
 };
-
-export enum EffectCode {
-  // ---- Card / general effects ----
-  add_card_to_opp_pile = 'add_card_to_opp_pile',
-  add_card_to_self_pile = 'add_card_to_self_pile',
-  apply_mod = 'apply_mod',
-  /** @deprecated legacy alias; use apply_mod */
-  apply_status = 'apply_status',
-  remove_mod = 'remove_mod',
-  deal_damage = 'deal_damage',
-  damage_status_mod = 'damage_status_mod',
-  draw_mod = 'draw_mod',
-
-  // ---- Passive-related effects ----
-  damage_bonus_low_health = 'damage_bonus_low_health',
-  block_bonus_flat = 'block_bonus_flat',
-  cost_mod = 'cost_mod',
-  mod_duration_bonus = 'mod_duration_bonus',
-  gain_energy = 'gain_energy',
-  first_card_free = 'first_card_free',
-  damage_bonus_by_type = 'damage_bonus_by_type',
-  set_turn_energy = 'set_turn_energy',
-  every_third_type_free = 'every_third_type_free',
-  ambush = 'ambush',
-  add_card_to_hand = 'add_card_to_hand',
-}
-
-export interface EffectInstance {
-  code: EffectCode;
-  params?: any; 
-  trigger?: TriggerPhase;
-}
-
-export interface EffectContext {
-  sourceCard: Card;
-  side: 'player' | 'opponent'; 
-  player: Player;
-  opponent: Opponent;
-  state: BattleState;
-  log: string[];
-}
 
 export enum DrawModType {
   ADD = 'add',
@@ -191,14 +129,6 @@ export interface GameState {
     card: Card | null;
     isVisible: boolean;
   };
-}
-
-export type StatusEffect = ActiveMod;
-export interface ActiveMod {
-  type: ModType;         // e.g., BLEEDING, EVASIVE, HANDHEX, …
-  stacks: number;        // how many stacks (always clamped by MOD_DEFS.maxStacks)
-  duration: number;      // remaining turns (always decremented by a single tick fn)
-  effects?: EffectInstance[]; // optional phase-bound effects (e.g., “deal bleed dmg on start”)
 }
 
 export interface DrawModification {

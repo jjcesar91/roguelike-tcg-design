@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { TrendingDown, AlertTriangle, TrendingUp, Target, Droplets, Shield } from 'lucide-react';
 import { StatusEffectModal } from '@/components/game/modals/StatusEffectModal';
 import { getStatusDisplayDuration } from '@/lib/gameUtils';
-import { ModType } from '@/types/game';
+import { ModType } from "@/content/modules/mods";
 
 interface StatusEffectsProps {
   effects: any[];

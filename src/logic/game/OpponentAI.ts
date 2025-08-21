@@ -1,4 +1,5 @@
-import { BattleState, Card, CardType, Opponent, Player, ModType } from '@/types/game';
+import { BattleState, Card, CardType, Opponent, Player } from '@/types/game';
+import { ModType } from "@/content/modules/mods";
 
 /**
  * Unified opponent AI for deciding which cards to play each turn.

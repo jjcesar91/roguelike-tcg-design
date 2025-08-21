@@ -1,6 +1,7 @@
 import Deck from './Deck'
 import StatusManager from './StatusManager'
-import { Card, Passive, PlayerClass, OpponentType, StatusEffect } from '@/types/game'
+import { Card, Passive, PlayerClass, OpponentType } from '@/types/game'
+import { StatusEffect } from "@/content/modules/mods"
 
 /**
  * Minimal character model (player/opponent) used by BattleEngine.

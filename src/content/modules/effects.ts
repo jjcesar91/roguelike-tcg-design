@@ -2,8 +2,49 @@
 // Temporary in-file registry. Move to its own module (e.g. lib/effectsRegistry.ts) once
 // all cards are migrated to structured effects.
 
-import { formatLogText, applyMod, consumeModStacks } from "@/lib/gameUtils";
-import { Card, DrawModType, EffectCode, EffectContext, EffectInstance, ModType, CardType } from "@/types/game";
+export interface EffectContext {
+    sourceCard: Card;
+    side: 'player' | 'opponent';
+    player: Player;
+    opponent: Opponent;
+    state: BattleState;
+    log: string[];
+}
+export enum EffectCode {
+    // ---- Card / general effects ----
+    add_card_to_opp_pile = 'add_card_to_opp_pile',
+    add_card_to_self_pile = 'add_card_to_self_pile',
+    apply_mod = 'apply_mod',
+    /** @deprecated legacy alias; use apply_mod */
+    apply_status = 'apply_status',
+    remove_mod = 'remove_mod',
+    deal_damage = 'deal_damage',
+    damage_status_mod = 'damage_status_mod',
+    draw_mod = 'draw_mod',
+
+    // ---- Passive-related effects ----
+    damage_bonus_low_health = 'damage_bonus_low_health',
+    block_bonus_flat = 'block_bonus_flat',
+    cost_mod = 'cost_mod',
+    mod_duration_bonus = 'mod_duration_bonus',
+    gain_energy = 'gain_energy',
+    first_card_free = 'first_card_free',
+    damage_bonus_by_type = 'damage_bonus_by_type',
+    set_turn_energy = 'set_turn_energy',
+    every_third_type_free = 'every_third_type_free',
+    ambush = 'ambush',
+    add_card_to_hand = 'add_card_to_hand'
+}
+export interface EffectInstance {
+    code: EffectCode;
+    params?: any;
+    trigger?: TriggerPhase;
+}
+// ------------------------------------------------------------------------------------
+
+import { formatLogText, applyMod, consumeModStacks, resolveAndApplyDamage } from "@/lib/gameUtils";
+import { Card, DrawModType, CardType, BattleState, Opponent, Player, TriggerPhase } from "@/types/game";
+import { ModType } from "./mods";
 
 
 function ensureArray<T>(x: T | T[] | undefined): T[] { return Array.isArray(x) ? x : x ? [x] : []; }
@@ -121,43 +162,32 @@ const EFFECTS: Record<EffectCode, (ctx: EffectContext, params?: any) => void> = 
     }
   },
 
-  // Deal direct damage to player or opponent
+  // Deal direct damage to player or opponent (delegates to unified routine)
   deal_damage: (ctx, params) => {
-    const { state, side, log, opponent, player, sourceCard } = ctx;
-    let amount: number = params?.amount ?? 0;
-    const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'opponent' : 'player');
-    if (amount <= 0) return;
+  const { state, side, log, opponent, player, sourceCard } = ctx;
+  const amount: number = params?.amount ?? 0;
+  const explicitTarget: 'player' | 'opponent' | undefined = params?.target;
+  if (amount <= 0) return;
 
-    if (target === 'player') {
-      // Apply to player's block first
-      if (state.playerBlock > 0) {
-        const absorbed = Math.min(state.playerBlock, amount);
-        state.playerBlock -= absorbed;
-        amount -= absorbed;
-        if (absorbed > 0) {
-          log.push(formatLogText(`${sourceCard.name} dealt ${absorbed} to player's block`, player.class, opponent.name, sourceCard.name));
-        }
-      }
-      if (amount > 0) {
-        player.health = Math.max(0, player.health - amount);
-        log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} dealt ${amount} damage to player`, player.class, opponent.name, sourceCard.name));
-      }
-    } else {
-      // Apply to opponent's block first
-      if (state.opponentBlock > 0) {
-        const absorbed = Math.min(state.opponentBlock, amount);
-        state.opponentBlock -= absorbed;
-        amount -= absorbed;
-        if (absorbed > 0) {
-          log.push(formatLogText(`${sourceCard.name} dealt ${absorbed} to ${opponent.name}'s block`, player.class, opponent.name, sourceCard.name));
-        }
-      }
-      if (amount > 0) {
-        opponent.health = Math.max(0, opponent.health - amount);
-        log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} dealt ${amount} damage to ${opponent.name}`, player.class, opponent.name, sourceCard.name));
-      }
-    }
-  },
+  // The resolver always applies damage to the opposite of `side`.
+  // If an effect explicitly targets the same side (self-damage/friendly fire),
+  // flip the side so the resolver will hit the intended target.
+  const defaultTarget: 'player' | 'opponent' = side === 'player' ? 'opponent' : 'player';
+  const intendedTarget: 'player' | 'opponent' = explicitTarget ?? defaultTarget;
+  const effectiveSide: 'player' | 'opponent' =
+    intendedTarget === defaultTarget ? side : (side === 'player' ? 'opponent' : 'player');
+
+  resolveAndApplyDamage({
+    side: effectiveSide,
+    source: 'effect',
+    baseDamage: amount,
+    card: sourceCard,
+    state,
+    player,
+    opponent,
+    log,
+  });
+},
 
   damage_status_mod: (ctx, params) => {
     const { state, side, sourceCard } = ctx;
@@ -298,4 +328,3 @@ export function runCardEffects(sourceCard: Card & { effects?: EffectInstance[] }
   }
   return true;
 }
-// ------------------------------------------------------------------------------------

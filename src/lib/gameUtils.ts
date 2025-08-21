@@ -1,7 +1,12 @@
 import { dbg } from '@/lib/debug';
-import { BattleState, Card, CardType, Deck, DrawModification, Rarity, GameState, Turn, Opponent, Player, PlayerClass, OpponentType, ModType, DrawModType, Difficulty, EffectInstance, EffectCode, ActiveMod, MOD_DEFS, TriggerPhase, Passive } from '@/types/game';
+import { BattleState, Card, CardType, Deck, DrawModification, Rarity, GameState, Turn, Opponent, Player, PlayerClass, OpponentType, DrawModType, Difficulty, TriggerPhase, Passive } from '@/types/game';
+import { ActiveMod, MOD_DEFS, ModType } from "@/content/modules/mods";
+import { MOD_DEFAULT_EFFECTS } from "@/content/modules/mods";
+import { EffectInstance } from "@/content/modules/effects";
+import { EffectCode } from "@/content/modules/effects";
 import * as gameData from '@/data/gameData';
 import { runCardEffects } from '@/content/modules/effects';
+
 
 dbg('gameUtils.ts loaded');
 dbg('gameData import:', gameData);
@@ -13,6 +18,133 @@ dbg('passives:', gameData.passives);
 const playerCards = gameData.playerCards;
 const opponents = gameData.opponents;
 const passives = gameData.passives;
+
+function performDraw(
+  side: 'player' | 'opponent',
+  state: BattleState,
+  player: Player,
+  opponent: Opponent,
+  logSink: string[],
+  opts?: { handLimit?: number }
+) {
+  const baseDrawCount = 3;
+  const isPlayer = side === 'player';
+  const mods = isPlayer ? state.playerDrawModifications : state.opponentDrawModifications;
+
+  const cardsToDraw = calculateModifiedDrawCount(baseDrawCount, mods);
+  const drawModificationLog = formatDrawModificationLog(mods, baseDrawCount);
+
+  const deck = isPlayer ? state.playerDeck : state.opponentDeck;
+  const discard = isPlayer ? state.playerDiscardPile : state.opponentDiscardPile;
+
+  const drawResult = drawCardsWithMinionEffects(
+    deck,
+    discard,
+    cardsToDraw,
+    side,
+    player.class,
+    opponent.name
+  );
+
+  if (isPlayer) {
+    state.playerHand = [...state.playerHand, ...drawResult.drawnCards];
+    state.playerDeck = drawResult.updatedDeck;
+    state.playerDiscardPile = drawResult.updatedDiscardPile;
+  } else {
+    state.opponentHand = [...state.opponentHand, ...drawResult.drawnCards];
+    state.opponentDeck = drawResult.updatedDeck;
+    state.opponentDiscardPile = drawResult.updatedDiscardPile;
+  }
+
+  if (drawModificationLog) {
+    logSink.push(formatLogText(drawModificationLog, player.class, opponent.name));
+  }
+
+  // Apply Wolf minion damage if any
+  if (drawResult.minionDamageLog.length > 0) {
+    const wolfDamage = drawResult.minionDamageLog.length * 5;
+    if (isPlayer) {
+      player.health = Math.max(0, player.health - wolfDamage);
+    } else {
+      opponent.health = Math.max(0, opponent.health - wolfDamage);
+    }
+  }
+  logSink.push(...drawResult.minionDamageLog);
+
+  // Enforce hand size limit if provided
+  const handLimit = opts?.handLimit;
+  if (typeof handLimit === 'number') {
+    const hand = isPlayer ? state.playerHand : state.opponentHand;
+    if (hand.length > handLimit) {
+      const excess = hand.length - handLimit;
+      const overflow = hand.splice(handLimit, excess);
+
+      // Add non-volatile cards to discard pile
+      const nonVolatile = overflow.filter(card =>
+        !card.types || !card.types.includes(CardType.VOLATILE)
+      );
+      if (isPlayer) {
+        state.playerDiscardPile = [...state.playerDiscardPile, ...nonVolatile];
+      } else {
+        state.opponentDiscardPile = [...state.opponentDiscardPile, ...nonVolatile];
+      }
+
+      // Burn volatile cards from overflow
+      const volatile = overflow.filter(card =>
+        card.types && card.types.includes(CardType.VOLATILE)
+      );
+      if (volatile.length > 0) {
+        logSink.push(formatLogText(
+          `${isPlayer ? player.class : opponent.name} burned ${volatile.length} volatile card(s) from hand overflow.`,
+          player.class,
+          opponent.name
+        ));
+      }
+    }
+  }
+}
+
+
+
+type ModSide = 'player' | 'opponent';
+
+function resolveModEffectParams(base: any, mod: ActiveMod, side: ModSide): any {
+  if (!base) return base;
+  const p = { ...base };
+  if (p.amountFromModStacks) p.amount = mod.stacks;
+  if (p.target === 'self') p.target = side;
+  if (p.target === 'opponent') p.target = side === 'player' ? 'opponent' : 'player';
+  return p;
+}
+
+function runModEffectsForPhase(
+  side: ModSide,
+  state: BattleState,
+  player: Player,
+  opponent: Opponent,
+  phase: TriggerPhase,
+  log: string[],
+) {
+  const mods: ActiveMod[] = side === 'player' ? (state.playerMods || []) : (state.opponentMods || []);
+  for (const mod of mods) {
+    const effects = mod.effects || [];
+    for (const eff of effects) {
+      if (eff.trigger !== phase) continue;
+      const params = resolveModEffectParams(eff.params, mod, side);
+      const pseudo: Card & { effects: EffectInstance[] } = {
+        id: `mod:${mod.type}:${Date.now()}`,
+        name: `[MOD] ${mod.type}`,
+        description: '',
+        cost: 0,
+        class: player.class,
+        rarity: Rarity.COMMON,
+        types: [],
+        effects: [ { ...eff, params } ],
+      };
+      runCardEffects(pseudo, { side, player, opponent, state, log }, log);
+    }
+  }
+}
 
 export function createDeck(cards: Card[], copies: number = 3): Deck {
   const deck: Card[] = [];
@@ -26,6 +158,7 @@ export function createDeck(cards: Card[], copies: number = 3): Deck {
     discardPile: []
   };
 }
+
 
 export function shuffleDeck(deck: Card[]): Card[] {
   const shuffled = [...deck];
@@ -110,6 +243,7 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
   // Determine who goes first
   const firstTurn = hasAmbush ? Turn.OPPONENT : Turn.PLAYER;
   dbg('First turn:', firstTurn);
+  const openingSide: 'player' | 'opponent' = firstTurn === Turn.PLAYER ? 'player' : 'opponent';
 
   // --- NEW LOGIC: Create battleLog and provisional state before any draws ---
   // Create battle log with appropriate message based on who goes first
@@ -147,7 +281,7 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
 
   // --- BEFORE DRAW phase ---
   triggerBeforeDraw(
-    firstTurn === Turn.PLAYER ? 'player' : 'opponent',
+    openingSide,
     provisionalState,
     player,
     opponent,
@@ -155,68 +289,7 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
   );
 
   // Perform opening draw for the side who starts
-  const baseDrawCount = 3;
-  if (firstTurn === Turn.PLAYER) {
-    const cardsToDraw = calculateModifiedDrawCount(baseDrawCount, provisionalState.playerDrawModifications);
-    const drawModificationLog = formatDrawModificationLog(provisionalState.playerDrawModifications, baseDrawCount);
-
-    const drawResult = drawCardsWithMinionEffects(
-      provisionalState.playerDeck,
-      provisionalState.playerDiscardPile,
-      cardsToDraw,
-      'player',
-      player.class,
-      opponent.name
-    );
-
-    provisionalState.playerHand = [
-      ...provisionalState.playerHand,
-      ...drawResult.drawnCards
-    ];
-    provisionalState.playerDeck = drawResult.updatedDeck;
-    provisionalState.playerDiscardPile = drawResult.updatedDiscardPile;
-
-    // Apply minion on-draw damage if any (e.g., Wolf)
-    if (drawResult.minionDamageLog.length > 0) {
-      const wolfDamage = drawResult.minionDamageLog.length * 5;
-      player.health = Math.max(0, player.health - wolfDamage);
-    }
-
-    if (drawModificationLog) {
-      provisionalState.battleLog.push(formatLogText(drawModificationLog, player.class, opponent.name));
-    }
-    provisionalState.battleLog.push(...drawResult.minionDamageLog);
-  } else {
-    const cardsToDraw = calculateModifiedDrawCount(baseDrawCount, provisionalState.opponentDrawModifications);
-    const drawModificationLog = formatDrawModificationLog(provisionalState.opponentDrawModifications, baseDrawCount);
-
-    const drawResult = drawCardsWithMinionEffects(
-      provisionalState.opponentDeck,
-      provisionalState.opponentDiscardPile,
-      cardsToDraw,
-      'opponent',
-      player.class,
-      opponent.name
-    );
-
-    provisionalState.opponentHand = [
-      ...provisionalState.opponentHand,
-      ...drawResult.drawnCards
-    ];
-    provisionalState.opponentDeck = drawResult.updatedDeck;
-    provisionalState.opponentDiscardPile = drawResult.updatedDiscardPile;
-
-    // Apply minion on-draw damage if any (e.g., Wolf)
-    if (drawResult.minionDamageLog.length > 0) {
-      const wolfDamage = drawResult.minionDamageLog.length * 5;
-      opponent.health = Math.max(0, opponent.health - wolfDamage);
-    }
-
-    if (drawModificationLog) {
-      provisionalState.battleLog.push(formatLogText(drawModificationLog, player.class, opponent.name));
-    }
-    provisionalState.battleLog.push(...drawResult.minionDamageLog);
-  }
+  performDraw(openingSide, provisionalState, player, opponent, provisionalState.battleLog);
 
   return provisionalState;
 }
@@ -237,7 +310,12 @@ export function getCardCost(card: Card, player: Player): number {
   return card.cost;
 }
 
-export function calculateDamageWithStatusEffects(damage: number, attackerMods: ActiveMod[], defenderMods: ActiveMod[], card?: Card): { finalDamage: number; evaded: boolean; consumeEvasive: boolean } {
+export function calculateDamageWithStatusEffects(
+  damage: number,
+  attackerMods: ActiveMod[],
+  defenderMods: ActiveMod[],
+  card?: Card
+): { finalDamage: number; evaded: boolean; consumeEvasive: boolean } {
   let finalDamage = damage;
   let evaded = false;
   let consumeEvasive = false;
@@ -268,6 +346,154 @@ export function calculateDamageWithStatusEffects(damage: number, attackerMods: A
   return { finalDamage: Math.max(0, finalDamage), evaded, consumeEvasive };
 }
 
+/**
+ * Unified damage resolution & application.
+ * Use this whenever a card or an effect deals damage.
+ *
+ * It handles:
+ *  - Status/mod interactions (weak, vulnerable, strength, bleeding, evasive)
+ *  - Block absorption & health reduction
+ *  - Logging & evasive stack consumption
+ *
+ * It is side-agnostic and works for both player and opponent.
+ */
+export function resolveAndApplyDamage(opts: {
+  side: 'player' | 'opponent';         // who is dealing the damage
+  source: 'attack' | 'effect';         // just for log clarity
+  baseDamage: number;                  // pre-mod, pre-block
+  card?: Card;                         // optional: card causing the damage
+  state: BattleState;                  // current battle state (mutated in-place for perf, but returned too)
+  player: Player;                      // current player (mutated in-place)
+  opponent: Opponent;                  // current opponent (mutated in-place)
+  log: string[];                       // battle log sink
+}): {
+  newState: BattleState;
+  newPlayer: Player;
+  newOpponent: Opponent;
+  dealt: number;                       // damage that actually hit HP (after block)
+  blocked: number;                     // amount absorbed by block
+  evaded: boolean;                     // true if Evasive cancelled the hit
+  consumedEvasive: boolean;            // if an evasive stack was consumed
+  brokeBlock: boolean;                 // true if block was present and reduced to 0
+} {
+  const {
+    side, source, baseDamage, card,
+    state, player, opponent, log
+  } = opts;
+
+  // Early exit: nothing to do
+  if (baseDamage <= 0) {
+    return {
+      newState: state,
+      newPlayer: player,
+      newOpponent: opponent,
+      dealt: 0,
+      blocked: 0,
+      evaded: false,
+      consumedEvasive: false,
+      brokeBlock: false
+    };
+  }
+
+  const isPlayer = side === 'player';
+  const attackerName = isPlayer ? 'Player' : opponent.name;
+  const defenderName = isPlayer ? opponent.name : player.class;
+
+  // Pull mods for both sides
+  const attackerMods = isPlayer ? (state.playerMods || []) : (state.opponentMods || []);
+  const defenderMods = isPlayer ? (state.opponentMods || []) : (state.playerMods || []);
+
+  // Compute pre-block damage considering mods (weak/vulnerable/strength/evasive/bleeding)
+  const { finalDamage, evaded, consumeEvasive } = calculateDamageWithStatusEffects(
+    baseDamage,
+    attackerMods,
+    defenderMods,
+    card
+  );
+
+  // If evaded, consume a stack and log
+  if (evaded) {
+    if (isPlayer) {
+      state.opponentMods = consumeModStacks(state.opponentMods || [], ModType.EVASIVE, 1);
+      log.push(formatLogText(`${defenderName}'s Evasive prevented damage from ${attackerName}'s ${card?.name || source}`, player.class, opponent.name, card?.name || ''));
+    } else {
+      state.playerMods = consumeModStacks(state.playerMods || [], ModType.EVASIVE, 1);
+      log.push(formatLogText(`${defenderName}'s Evasive prevented damage from ${attackerName}'s ${card?.name || source}`, player.class, opponent.name, card?.name || ''));
+    }
+    return {
+      newState: state,
+      newPlayer: player,
+      newOpponent: opponent,
+      dealt: 0,
+      blocked: 0,
+      evaded: true,
+      consumedEvasive: consumeEvasive,
+      brokeBlock: false
+    };
+  }
+
+  let pending = Math.max(0, finalDamage);
+  let blocked = 0;
+  let dealt = 0;
+  let brokeBlock = false;
+
+  // Determine defender block key & current block
+  const blockKey = (isPlayer ? 'opponentBlock' : 'playerBlock') as 'playerBlock' | 'opponentBlock';
+  let defenderBlock = state[blockKey] || 0;
+
+  // Apply to block first
+  if (defenderBlock > 0 && pending > 0) {
+    const absorbed = Math.min(defenderBlock, pending);
+    defenderBlock -= absorbed;
+    pending -= absorbed;
+    blocked += absorbed;
+
+    // Logging for block hits
+    if (absorbed > 0) {
+      const who = isPlayer ? 'Player' : opponent.name;
+      const tgt = isPlayer ? `${opponent.name}'s` : `${player.class}'s`;
+      log.push(formatLogText(`${who} deals ${absorbed} damage to ${tgt} block with ${card?.name || source}`, player.class, opponent.name, card?.name || ''));
+    }
+
+    // Did we break block?
+    if (defenderBlock === 0 && (state[blockKey] || 0) > 0 && pending > 0) {
+      brokeBlock = true;
+      const who = isPlayer ? 'Player' : opponent.name;
+      const tgt = isPlayer ? opponent.name : player.class;
+      // Add a "breaks block" log when block reaches zero and there is spillover
+      log.push(formatLogText(`${who} breaks ${tgt}'s block`, player.class, opponent.name, card?.name || ''));
+    }
+  }
+
+  // Commit updated block back to state
+  state[blockKey] = defenderBlock;
+
+  // Spill to HP
+  if (pending > 0) {
+    if (isPlayer) {
+      opponent.health = Math.max(0, opponent.health - pending);
+    } else {
+      player.health = Math.max(0, player.health - pending);
+    }
+    dealt = pending;
+
+    const who = isPlayer ? 'Player' : opponent.name;
+    const tgt = isPlayer ? opponent.name : player.class;
+    log.push(formatLogText(`${who} deals ${pending} damage to ${tgt} with ${card?.name || source}`, player.class, opponent.name, card?.name || ''));
+  }
+
+  return {
+    newState: state,
+    newPlayer: player,
+    newOpponent: opponent,
+    dealt,
+    blocked,
+    evaded: false,
+    consumedEvasive: false,
+    brokeBlock
+  };
+}
+
 // Apply or refresh a mod in a fully generic way:
 export function applyMod(mods: ActiveMod[], type: ModType, stacksDelta = 1, duration?: number, effects?: EffectInstance[]): ActiveMod[] {
   const def = MOD_DEFS[type];
@@ -285,14 +511,14 @@ export function applyMod(mods: ActiveMod[], type: ModType, stacksDelta = 1, dura
       ...current,
       stacks: newStacks,
       duration: d,        // refresh duration on reapply (consistent & simple)
-      effects: effects ?? current.effects
+      effects: effects ?? current.effects ?? MOD_DEFAULT_EFFECTS[type]
     };
   } else {
     next.push({
       type,
       stacks: Math.min(def.maxStacks, Math.max(0, stacksDelta)),
       duration: d,
-      effects
+      effects: effects ?? MOD_DEFAULT_EFFECTS[type]
     });
   }
   return next;
@@ -429,8 +655,6 @@ function runTriggeredEffectsForPhase(
   const bundles: EffectInstance[] = [
     ...playerPassives.flatMap(p => pick(p.effects)),
     ...opponentPassives.flatMap(p => pick(p.effects)),
-    ...(state.playerMods || []).flatMap(m => pick(m.effects)),
-    ...(state.opponentMods || []).flatMap(m => pick(m.effects)),
   ];
 
   for (const eff of bundles) {
@@ -459,7 +683,24 @@ export function triggerBeforeDraw(
   battleState.playerMods = tickMods(battleState.playerMods || []);
   battleState.opponentMods = tickMods(battleState.opponentMods || []);
 
-  // Trigger effects bound to BEFOREDRAW
+  // --- Start-of-turn housekeeping now lives here ---
+  if (side === 'player') {
+    // Player block handling (Shield Up persistence)
+    if (!battleState.playerPersistentBlock) {
+      battleState.playerBlock = 0;
+    } else {
+      log.push(formatLogText("Player's block persists due to Shield Up effect", player.class, opponent.name));
+      battleState.playerPersistentBlock = false; // consume persistence
+    }
+  } else {
+    // Opponent block resets at the start of its turn
+    battleState.opponentBlock = 0;
+  }
+
+  // Run mod effects for BEFOREDRAW phase
+  runModEffectsForPhase(side, battleState, player, opponent, TriggerPhase.BEFOREDRAW, log);
+
+  // Trigger effects bound to BEFOREDRAW (passives only)
   runTriggeredEffectsForPhase(TriggerPhase.BEFOREDRAW, side, battleState, player, opponent, log);
 }
 
@@ -474,57 +715,41 @@ export function updateDrawModifications(modifications: DrawModification[]): Draw
 }
 
 export function calculateModifiedDrawCount(baseDrawCount: number, modifications: DrawModification[]): number {
-  let modifiedCount = baseDrawCount;
-  
-  // Process 'set' modifications first (they override base value)
-  const setModifications = modifications.filter(mod => mod.type === DrawModType.SET);
-  if (setModifications.length > 0) {
-    // Use the most recent set modification (last in array)
-    modifiedCount = setModifications[setModifications.length - 1].value;
+  if (!modifications || modifications.length === 0) return Math.max(0, baseDrawCount);
+
+  let setValue: number | null = null;
+  let add = 0;
+  let subtract = 0;
+
+  for (const mod of modifications) {
+    switch (mod.type) {
+      case DrawModType.SET:
+        setValue = mod.value; // last SET wins
+        break;
+      case DrawModType.ADD:
+        add += mod.value;
+        break;
+      case DrawModType.SUBTRACT:
+        subtract += mod.value;
+        break;
+    }
   }
-  
-  // Then process 'add' modifications
-  modifications
-    .filter(mod => mod.type === DrawModType.ADD)
-    .forEach(mod => {
-      modifiedCount += mod.value;
-    });
-  
-  // Finally process 'subtract' modifications
-  modifications
-    .filter(mod => mod.type === DrawModType.SUBTRACT)
-    .forEach(mod => {
-      modifiedCount = Math.max(0, modifiedCount - mod.value); // Don't go below 0
-    });
-  
-  const finalCount = Math.max(0, modifiedCount); // Ensure we never return negative draw count
-  return finalCount;
+
+  let result = (setValue !== null ? setValue : baseDrawCount) + add - subtract;
+  return Math.max(0, result);
 }
 
 export function formatDrawModificationLog(modifications: DrawModification[], baseDrawCount: number): string {
-  if (modifications.length === 0) {
-    return '';
-  }
-  
-  const finalCount = calculateModifiedDrawCount(baseDrawCount, modifications);
-  
-  if (finalCount === baseDrawCount) {
-    return '';
-  }
-  
+  if (!modifications || modifications.length === 0) return '';
+
   // Don't log Dirty Trick modifications - they're already logged separately
-  const hasDirtyTrick = modifications.some(mod => mod.source === 'Dirty Trick');
-  if (hasDirtyTrick) {
-    return '';
-  }
-  
+  if (modifications.some(mod => mod.source === 'Dirty Trick')) return '';
+
+  const finalCount = calculateModifiedDrawCount(baseDrawCount, modifications);
+  if (finalCount === baseDrawCount) return '';
+
   const activeSources = modifications.map(mod => mod.source).join(', ');
-  
-  if (finalCount > baseDrawCount) {
-    return `Draw modifications (${activeSources}): Drawing ${finalCount} cards instead of ${baseDrawCount}`;
-  } else {
-    return `Draw modifications (${activeSources}): Drawing ${finalCount} cards instead of ${baseDrawCount}`;
-  }
+  return `Draw modifications (${activeSources}): Drawing ${finalCount} cards instead of ${baseDrawCount}`;
 }
 
 // Helper function to format log text with bold keywords and card names
@@ -642,64 +867,18 @@ function playOneCard(
   // Push to played stack now
   (isPlayer ? newBattleState.playerPlayedCards : newBattleState.opponentPlayedCards).push(card);
 
-  // 4) Apply ATTACK (damage last)
-  if (card.attack) {
-    let pendingDamage = Math.max(0, card.attack || 0);
-    const defenderMods = isPlayer ? newBattleState.opponentMods : newBattleState.playerMods;
-    const isAttackCard = card.types?.includes(CardType.MELEE) || card.types?.includes(CardType.ATTACK);
-    const evasive = defenderMods?.find(m => m.type === ModType.EVASIVE && m.stacks > 0);
-    if (isAttackCard && evasive && pendingDamage > 0) {
-      if (isPlayer) {
-        log.push(formatLogText(`${newOpponent.name}'s Evasive prevented damage from player's ${card.name}`, newPlayer.class, newOpponent.name, card.name));
-        newBattleState.opponentMods = consumeModStacks(newBattleState.opponentMods || [], ModType.EVASIVE, 1);
-      } else {
-        log.push(formatLogText(`${newPlayer.class}'s Evasive prevented damage from ${newOpponent.name}'s ${card.name}`, newPlayer.class, newOpponent.name, card.name));
-        newBattleState.playerMods = consumeModStacks(newBattleState.playerMods || [], ModType.EVASIVE, 1);
-      }
-      pendingDamage = 0;
-    }
-
-    if (pendingDamage > 0) {
-      if (isPlayer) {
-        // apply to opponent
-        if (newBattleState.opponentBlock > 0) {
-          if (newBattleState.opponentBlock >= pendingDamage) {
-            newBattleState.opponentBlock -= pendingDamage;
-            log.push(formatLogText(`Player deals ${pendingDamage} damage to ${newOpponent.name}'s block with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
-            pendingDamage = 0;
-          } else {
-            const through = pendingDamage - newBattleState.opponentBlock;
-            newBattleState.opponentBlock = 0;
-            newOpponent.health = Math.max(0, newOpponent.health - through);
-            log.push(formatLogText(`Player breaks ${newOpponent.name}'s block and deals ${through} damage with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
-            pendingDamage = 0;
-          }
-        } else {
-          newOpponent.health = Math.max(0, newOpponent.health - pendingDamage);
-          log.push(formatLogText(`Player deals ${pendingDamage} damage with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
-          pendingDamage = 0;
-        }
-      } else {
-        // apply to player
-        if (newBattleState.playerBlock > 0) {
-          if (newBattleState.playerBlock >= pendingDamage) {
-            newBattleState.playerBlock -= pendingDamage;
-            log.push(formatLogText(`${newOpponent.name} deals ${pendingDamage} damage to ${newPlayer.class}'s block with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
-            pendingDamage = 0;
-          } else {
-            const through = pendingDamage - newBattleState.playerBlock;
-            newBattleState.playerBlock = 0;
-            newPlayer.health = Math.max(0, newPlayer.health - through);
-            log.push(formatLogText(`${newOpponent.name} breaks ${newPlayer.class}'s block and deals ${through} damage with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
-            pendingDamage = 0;
-          }
-        } else {
-          newPlayer.health = Math.max(0, newPlayer.health - pendingDamage);
-          log.push(formatLogText(`${newOpponent.name} deals ${pendingDamage} damage with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
-          pendingDamage = 0;
-        }
-      }
-    }
+  // 4) Apply ATTACK (damage last) via unified resolver
+  if (card.attack && card.attack > 0) {
+    resolveAndApplyDamage({
+      side,
+      source: 'attack',
+      baseDamage: card.attack || 0,
+      card,
+      state: newBattleState,
+      player: newPlayer,
+      opponent: newOpponent,
+      log,
+    });
   }
 
   // 5) Apply DEFENSE
@@ -1068,15 +1247,7 @@ export function opponentPlayCard(
   return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
 }
 
-export function playOpponentCard(
-  opponent: Opponent, 
-  player: Player, 
-  battleState: BattleState,
-  cardToPlay: Card
-): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
-  const log: string[] = [];
-  return playSingleOpponentCard(cardToPlay, opponent, player, battleState, battleState.opponentEnergy, log);
-}
+
 
 export function drawCardsWithMinionEffects(
   deck: Deck, 
@@ -1164,6 +1335,8 @@ export function drawCardsWithReshuffle(
   };
 }
 
+/** @deprecated Legacy stub. Use drawCardsWithMinionEffects or drawCardsWithReshuffle instead. */
+// Kept temporarily for backward compatibility; prefer the deck-aware helpers.
 export function drawCards(battleState: BattleState, numCards: number = 1): BattleState {
   const newBattleState = { ...battleState };
   
@@ -1185,26 +1358,6 @@ export function drawCards(battleState: BattleState, numCards: number = 1): Battl
   return newBattleState;
 }
 
-export function applyBleedingDamage(
-  targetMods: ActiveMod[],
-  targetHealth: number,
-  targetName: string,
-  isPlayer: boolean,
-  playerClass: PlayerClass = PlayerClass.WARRIOR,
-  opponentName: string = 'Alpha Wolf'
-): { newHealth: number; logMessages: string[] } {
-  const logMessages: string[] = [];
-  let newHealth = targetHealth;
-
-  const bleeding = (targetMods || []).find(m => m.type === ModType.BLEEDING && m.stacks > 0);
-  if (bleeding) {
-    const damage = bleeding.stacks;
-    newHealth = Math.max(0, targetHealth - damage);
-    if (isPlayer) logMessages.push(formatLogText(`${playerClass} takes ${damage} bleeding damage`, playerClass, opponentName));
-    else logMessages.push(formatLogText(`${opponentName} takes ${damage} bleeding damage`, playerClass, opponentName));
-  }
-  return { newHealth, logMessages };
-}
 
 export function endTurn(battleState: BattleState, player: Player, opponent: Opponent): { newBattleState: BattleState; newPlayer: Player; newOpponent: Opponent } {
   const newBattleState = { ...battleState };
@@ -1262,18 +1415,6 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     // Store cards added during beforeDraw (these should be kept)
     const startOfTurnAddedCards = [...newBattleState.opponentHand];
 
-    // Start of opponent turn - apply bleeding damage to opponent
-    const opponentBleedingResult = applyBleedingDamage(
-      newBattleState.opponentMods,
-      newOpponent.health,
-      newOpponent.name,
-      false,
-      newPlayer.class,
-      newOpponent.name
-    );
-    newOpponent.health = opponentBleedingResult.newHealth;
-    log.push(...opponentBleedingResult.logMessages);
-
     // Start of opponent turn - draw cards with proper reshuffle logic
     // Clear opponent's hand first, but preserve cards added during beforeDraw phase
     const previousHandCards = newBattleState.opponentHand.filter(card =>
@@ -1293,56 +1434,14 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
     if (opponentPreviousVolatileCardsBurned.length > 0) {
       log.push(formatLogText(`${newOpponent.name} burned ${opponentPreviousVolatileCardsBurned.length} volatile card(s) from previous turn.`, newPlayer.class, newOpponent.name));
     }
-
-    // Calculate modified draw count based on active modifications
-    const baseDrawCount = 3;
-    const cardsToDraw = calculateModifiedDrawCount(baseDrawCount, newBattleState.opponentDrawModifications);
-
-    const drawResult = drawCardsWithMinionEffects(
-      newBattleState.opponentDeck,
-      newBattleState.opponentDiscardPile,
-      cardsToDraw,
-      'opponent',
-      newPlayer.class,
-      newOpponent.name
-    );
-    newBattleState.opponentHand = [...newBattleState.opponentHand, ...drawResult.drawnCards];
-    newBattleState.opponentDeck = drawResult.updatedDeck;
-    newBattleState.opponentDiscardPile = drawResult.updatedDiscardPile;
-
-    // Enforce hand size limit for opponent (max 7 cards)
-    if (newBattleState.opponentHand.length > 7) {
-      const excessCards = newBattleState.opponentHand.length - 7;
-      const cardsToDiscard = newBattleState.opponentHand.splice(7, excessCards);
-      newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, ...cardsToDiscard];
-
-      // Burn volatile cards that were discarded
-      const opponentOverflowVolatileCardsBurned = cardsToDiscard.filter(card =>
-        card.types && card.types.includes(CardType.VOLATILE)
-      );
-
-      if (opponentOverflowVolatileCardsBurned.length > 0) {
-        log.push(formatLogText(`${newOpponent.name} burned ${opponentOverflowVolatileCardsBurned.length} volatile card(s) from hand overflow.`, newPlayer.class, newOpponent.name));
-      }
-
-      // Note: Non-volatile discarded cards are not logged for opponent
-    }
-
-    // Apply damage from Wolf minions if any
-    if (drawResult.minionDamageLog.length > 0) {
-      // Calculate total damage from Wolf minions
-      const wolfDamage = drawResult.minionDamageLog.length * 5; // Each Wolf deals 5 damage
-      newOpponent.health = Math.max(0, newOpponent.health - wolfDamage);
-    }
-
-    log.push(...drawResult.minionDamageLog);
-
-    dbg(`Opponent drew ${drawResult.drawnCards.length} cards`);
+    // Start-of-turn draw for opponent (with hand limit 7)
+    performDraw('opponent', newBattleState, newPlayer, newOpponent, log, { handLimit: 7 });
+    dbg(`Opponent drew cards`);
   } else {
     // End of opponent turn - discard all cards in hand and reset block
     const cardsToDiscard = [...newBattleState.opponentHand];
     newBattleState.opponentHand = [];
-    newBattleState.opponentBlock = 0; // Reset opponent block at end of turn
+    // newBattleState.opponentBlock = 0; // Reset opponent block at end of turn (now handled in triggerBeforeDraw)
 
     // Burn volatile cards that were discarded
     const opponentEndTurnVolatileCardsBurned = cardsToDiscard.filter(card =>
@@ -1380,62 +1479,9 @@ export function endTurn(battleState: BattleState, player: Player, opponent: Oppo
       log
     );
 
-    // Handle persistent block - only reset if Shield Up wasn't played
-    if (!newBattleState.playerPersistentBlock) {
-      newBattleState.playerBlock = 0; // Reset player block at start of new player turn
-    } else {
-      log.push(formatLogText('Player\'s block persists due to Shield Up effect', newPlayer.class, newOpponent.name));
-      newBattleState.playerPersistentBlock = false; // Reset the flag for next time
-    }
-
-    // Start of player turn - apply bleeding damage to player
-    const playerBleedingResult = applyBleedingDamage(
-      newBattleState.playerMods,
-      newPlayer.health,
-      newPlayer.class,
-      true,
-      newPlayer.class,
-      newOpponent.name
-    );
-    newPlayer.health = playerBleedingResult.newHealth;
-    log.push(...playerBleedingResult.logMessages);
-
-    // Start of player turn - draw cards with proper reshuffle logic
-    // Calculate modified draw count based on active modifications
-    const baseDrawCount = 3;
-    const cardsToDraw = calculateModifiedDrawCount(baseDrawCount, newBattleState.playerDrawModifications);
-
-    // Generate log message for draw modifications if any
-    const drawModificationLog = formatDrawModificationLog(newBattleState.playerDrawModifications, baseDrawCount);
-
-    const drawResult = drawCardsWithMinionEffects(
-      newBattleState.playerDeck,
-      newBattleState.playerDiscardPile,
-      cardsToDraw,
-      'player',
-      newPlayer.class,
-      newOpponent.name
-    );
-    newBattleState.playerHand = [...newBattleState.playerHand, ...drawResult.drawnCards];
-    newBattleState.playerDeck = drawResult.updatedDeck;
-    newBattleState.playerDiscardPile = drawResult.updatedDiscardPile;
-
-    // Add draw modification log if there were any active modifications
-    if (drawModificationLog) {
-      log.push(formatLogText(drawModificationLog, newPlayer.class, newOpponent.name));
-    }
-
-    // Apply damage from Wolf minions if any
-    if (drawResult.minionDamageLog.length > 0) {
-      // Calculate total damage from Wolf minions
-      const wolfDamage = drawResult.minionDamageLog.length * 5; // Each Wolf deals 5 damage
-      newPlayer.health = Math.max(0, newPlayer.health - wolfDamage);
-    }
-
-    log.push(...drawResult.minionDamageLog);
-
-    dbg(`Player drew ${drawResult.drawnCards.length} cards`);
-
+    // Start-of-turn draw for player (no hand limit)
+    performDraw('player', newBattleState, newPlayer, newOpponent, log);
+    dbg(`Player drew cards`);
     // NOW update draw modifications AFTER the player has drawn their cards
     newBattleState.playerDrawModifications = updateDrawModifications(newBattleState.playerDrawModifications);
     newBattleState.opponentDrawModifications = updateDrawModifications(newBattleState.opponentDrawModifications);

@@ -1,4 +1,6 @@
-import { PlayerClass, Passive, EffectCode, ModType, CardType, TriggerPhase } from '@/types/game';
+import { PlayerClass, Passive, CardType, TriggerPhase } from '@/types/game';
+import { ModType } from "./mods";
+import { EffectCode } from "./effects";
 
 // Effect-driven passives. Each passive is a bundle of EffectInstances that may
 // optionally include a `trigger` phase. This removes hard-coded conditionals.
