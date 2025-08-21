@@ -168,21 +168,38 @@ const EFFECTS: Record<EffectCode, (ctx: EffectContext, params?: any) => void> = 
     }
   },
 
-  // Deal direct damage to player or opponent (delegates to unified routine)
   deal_damage: (ctx, params) => {
     const { state, side, log, opponent, player, sourceCard } = ctx;
     const amount: number = params?.amount ?? 0;
     const explicitTarget: 'player' | 'opponent' | undefined = params?.target;
     if (amount <= 0) return;
 
-    // The resolver always applies damage to the opposite of `side`.
-    // If an effect explicitly targets the same side (self-damage/friendly fire),
-    // flip the side so the resolver will hit the intended target.
+    const selfSide: 'player' | 'opponent' = side;
     const defaultTarget: 'player' | 'opponent' = side === 'player' ? 'opponent' : 'player';
     const intendedTarget: 'player' | 'opponent' = explicitTarget ?? defaultTarget;
-    const effectiveSide: 'player' | 'opponent' =
-      intendedTarget === defaultTarget ? side : (side === 'player' ? 'opponent' : 'player');
 
+    const isSelf = intendedTarget === selfSide;
+    const isMod = typeof sourceCard?.id === 'string' && sourceCard.id.startsWith('mod:');
+
+    // Self‑targeted damage: apply directly to HP and log as self damage.
+    // (For mod-origin damage like Bleeding, this also correctly bypasses block.)
+    if (isSelf) {
+      const dmg = Math.max(0, amount);
+      if (dmg > 0) {
+        if (selfSide === 'player') {
+          player.health = Math.max(0, player.health - dmg);
+          log.push(formatLogText(`Player takes ${dmg} damage from ${sourceCard?.name || 'effect'}`, player.class, opponent.name, sourceCard?.name));
+        } else {
+          opponent.health = Math.max(0, opponent.health - dmg);
+          log.push(formatLogText(`${opponent.name} takes ${dmg} damage from ${sourceCard?.name || 'effect'}`, player.class, opponent.name, sourceCard?.name));
+        }
+      }
+      return;
+    }
+
+    // Non‑self damage: delegate to the unified routine. If the effect explicitly targets the
+    // same side we already handled it above, otherwise we keep default/opposite targeting.
+    const effectiveSide: 'player' | 'opponent' = side; // attacker is the owner of the effect
     resolveAndApplyDamage({
       side: effectiveSide,
       source: 'effect',

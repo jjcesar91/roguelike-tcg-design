@@ -44,14 +44,14 @@ export const MOD_DEFAULT_EFFECTS: Partial<Record<ModType, EffectInstance[]>> = {
   [ModType.VULNERABLE]: [
     {
       code: EffectCode.damage_mod as any,
-      params: { amount: 50 }, // e.g. +50% incoming damage
+      params: { percent: 50 }, // e.g. +50% incoming damage
       trigger: TriggerPhase.ONDAMAGEINCOMING,
     },
   ],
   [ModType.WEAK]: [
     {
       code: EffectCode.damage_mod as any,
-      params: { amount: -25 }, // e.g. -25% outgoing damage
+      params: { percent: -25 }, // e.g. -25% outgoing damage
       trigger: TriggerPhase.ONDAMAGEDEALING,
     },
   ],

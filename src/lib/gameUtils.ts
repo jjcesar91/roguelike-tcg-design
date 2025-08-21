@@ -483,6 +483,32 @@ export function resolveAndApplyDamage(opts: {
     };
   }
 
+  // --- MOD DAMAGE: bypass block logic for mod-originated damage ---
+  const isModDamage = !!(card && typeof card.id === 'string' && card.id.startsWith('mod:'));
+  if (isModDamage) {
+    const pending = Math.max(0, finalDamage);
+    if (pending > 0) {
+      if (isPlayer) {
+        opponent.health = Math.max(0, opponent.health - pending);
+      } else {
+        player.health = Math.max(0, player.health - pending);
+      }
+      const who = isPlayer ? 'Player' : opponent.name;
+      const tgt = isPlayer ? opponent.name : player.class;
+      log.push(formatLogText(`${who} deals ${pending} direct damage to ${tgt} with ${card?.name || source} (ignores block)`, player.class, opponent.name, card?.name || ''));
+    }
+    return {
+      newState: state,
+      newPlayer: player,
+      newOpponent: opponent,
+      dealt: Math.max(0, finalDamage),
+      blocked: 0,
+      evaded: false,
+      consumedEvasive: false,
+      brokeBlock: false,
+    };
+  }
+
   let pending = Math.max(0, finalDamage);
   let blocked = 0;
   let dealt = 0;
@@ -882,14 +908,7 @@ function playOneCard(
     }
   }
 
-  // 3) Run effects BEFORE damage/block so they can modify attack/defense/cost
-  runCardEffects(
-    card as Card & { effects?: EffectInstance[] },
-    { side, player: newPlayer, opponent: newOpponent, state: newBattleState, log },
-    log
-  );
-
-  // 2) (moved) Energy deduction AFTER effects so cost mods/flags apply
+  // 2) Energy deduction (effects are run later, after damage)
   let costToPay = getCardCost(card, newPlayer);
   if (isPlayer && (newBattleState as any).__firstCardFreePlayer && wasFirst) {
     costToPay = 0; (newBattleState as any).__firstCardFreePlayer = false;
@@ -902,7 +921,7 @@ function playOneCard(
   // Push to played stack now
   (isPlayer ? newBattleState.playerPlayedCards : newBattleState.opponentPlayedCards).push(card);
 
-  // 4) Apply ATTACK (damage last) via unified resolver
+  // 3) Apply ATTACK (damage last) via unified resolver
   if (card.attack && card.attack > 0) {
     resolveAndApplyDamage({
       side,
@@ -916,7 +935,36 @@ function playOneCard(
     });
   }
 
-  // 5) Apply DEFENSE
+  // 5) Now run the card's effects, but only if either the card has no attack
+  //    or its attack actually dealt damage (not fully evaded/zeroed).
+  {
+    const hasAttack = !!(card.attack && card.attack > 0);
+    let canRunEffects = !hasAttack; // if no attack, always run effects
+
+    if (hasAttack) {
+      // Check the last damage resolution outcome from the log/state we just produced.
+      // We use a conservative rule: if damage was evaded or reduced to exactly 0, skip effects.
+      // Since resolveAndApplyDamage already handled logs and state, we infer from HP/block change via a flag.
+      // To keep it robust, recompute one-shot eligibility based on most recent entry:
+      const lastLog = log[log.length - 1] || '';
+      const evadedHit = /Evasive prevented damage/.test(lastLog);
+      const zeroedHit = /deals 0 damage/.test(lastLog);
+      canRunEffects = !(evadedHit || zeroedHit);
+    }
+
+    if (canRunEffects) {
+      runCardEffects(
+        card as Card & { effects?: EffectInstance[] },
+        { side, player: newPlayer, opponent: newOpponent, state: newBattleState, log },
+        log
+      );
+    } else {
+      // Optional: diagnostic log to explain skipped effects due to no damage landing
+      // log.push(formatLogText(`${isPlayer ? newPlayer.class : newOpponent.name}'s ${card.name} effects did not trigger because the attack dealt no damage`, newPlayer.class, newOpponent.name, card.name));
+    }
+  }
+
+  // 6) Apply DEFENSE
   if (card.defense) {
     const block = isPlayer ? calculateCardBlock(card, newPlayer) : (card.defense || 0);
     if (isPlayer) {
@@ -970,316 +1018,58 @@ export function opponentPlayCard(
   battleState: BattleState,
   specificCard?: Card  // Optional parameter to play a specific card
 ): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
-  dbg('=== OPPONENT PLAY CARD FUNCTION CALLED ===');
-  dbg('This is the CORRECT function with Call the Pack handling!');
-  dbg('Specific card to play:', specificCard?.name);
-  
+  dbg('=== OPPONENT PLAY CARD (EXECUTION ONLY) ===');
   const log: string[] = [];
+
+  // Copy inputs to avoid accidental external mutation; playOneCard mutates provided copies.
   let currentPlayer = { ...player };
   let currentOpponent = { ...opponent };
   let currentBattleState = { ...battleState };
-  let remainingEnergy = 2; // Opponent has 2 energy
-  
-  // Get the opponent's playable cards
-  const playableCards = currentBattleState.opponentHand.filter(card => {
-    return !card.unplayable && card.cost <= remainingEnergy;
-  });
-  
-  // If a specific card is provided, use that one instead of prioritizing
-  let cardToPlay: Card | undefined;
-  
-  if (specificCard) {
-    // Verify the specific card is actually playable
-    cardToPlay = playableCards.find(card => card.id === specificCard.id);
-    dbg('Looking for specific card:', specificCard.name, 'Found:', cardToPlay?.name);
-  }
-  
-  // If no specific card or specific card not found, use prioritization logic
-  if (!cardToPlay) {
-    dbg('=== OPPONENT CALL THE PACK DEBUG ===');
-    dbg('Playable cards:', playableCards.map(c => ({ name: c.name, id: c.id })));
-    
-    cardToPlay = playableCards.find(card => {
-      dbg('Checking card:', card.name, card.id);
-      dbg('Name includes "call the pack":', card.name?.toLowerCase().includes('call the pack'));
-      dbg('ID matches call_pack:', card.id === 'call_pack');
-      dbg('ID matches beast_pack_mentality:', card.id === 'beast_pack_mentality');
-      return (card.name && card.name.toLowerCase().includes('call the pack')) || 
-             (card.id && (card.id === 'call_pack' || card.id === 'beast_pack_mentality'));
-    });
-    
-    dbg('Call the Pack card found:', cardToPlay);
-    
-    // If no Call the Pack card, just play the first playable card
-    if (!cardToPlay && playableCards.length > 0) {
-      cardToPlay = playableCards[0];
-      dbg('No Call the Pack found, playing first card:', cardToPlay.name);
-    }
-  }
-  
-  // If no card can be played, return current state
-  if (!cardToPlay) {
-    dbg('No card to play, returning current state');
+
+  // Opponent energy should already be set by turn flow; default to 2 as a fallback.
+  const remainingEnergy = typeof currentBattleState.opponentEnergy === 'number'
+    ? currentBattleState.opponentEnergy
+    : 2;
+
+  // If no specific card is provided, this function does NOT decide what to play anymore.
+  // Higher-level AI (OpponentAI.decidePlays) must choose the card and pass it here.
+  if (!specificCard) {
+    dbg('No specific card supplied to opponentPlayCard; skipping (decision lives in OpponentAI.decidePlays).');
     return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
   }
-  
-  // Since this is the AI combination mode (no specific card), play using combination logic
-  dbg('🤖 AI combination mode - playing optimal combinations...');
-  const lastTurnDamagePrevented = currentBattleState.battleLog.some(logEntry => 
-    logEntry.includes("'s Evasive prevented") && logEntry.includes("from")
+
+  // Verify the specific card is actually in hand and playable with current conditions/energy
+  const handCard = currentBattleState.opponentHand.find(c => c.id === specificCard.id);
+  if (!handCard) {
+    dbg('Specified card not found in opponent hand:', specificCard.name);
+    return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
+  }
+  if (handCard.unplayable || handCard.cost > remainingEnergy) {
+    dbg('Specified card is not playable due to flags or energy:', handCard.name);
+    return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
+  }
+
+  // Respect any card-specific play conditions (e.g., Booby Trap, Backstab, etc.)
+  const lastTurnDamagePrevented = currentBattleState.battleLog.some(entry =>
+    entry.includes("'s Evasive prevented") && entry.includes('from')
   );
-  
-  dbg('=== BOOBY TRAP DEBUG ===');
-  dbg('Last turn damage prevented:', lastTurnDamagePrevented);
-  dbg('Total battle log entries:', currentBattleState.battleLog.length);
-  dbg('Battle log entries:', currentBattleState.battleLog);
-  dbg('Checking for Evasive logs:', currentBattleState.battleLog.filter(log => log.includes('Evasive')));
-  dbg('Looking for patterns: "' + "'s Evasive prevented" + '" and "' + "from" + '"');
-  dbg('Direct string check results:');
-  currentBattleState.battleLog.forEach((log, index) => {
-    const hasEvasive = log.includes("'s Evasive prevented") && log.includes("from");
-    dbg(`[${index}]: "${log}" -> contains patterns: ${hasEvasive}`);
-  });
-  dbg('=== END BOOBY TRAP DEBUG ===');
-  
-  // If a specific card is provided, play just that card (respect the component's choice)
-  if (specificCard) {
-    dbg('🎯 Playing specific card as requested by component:', specificCard.name);
-    
-    // Verify the specific card is actually playable
-    const foundCard = playableCards.find(card => card.id === specificCard.id);
-    if (!foundCard) {
-      dbg('❌ Specific card not found in playable cards:', specificCard.name);
-      return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
-    }
-    
-    if (foundCard.cost > remainingEnergy) {
-      dbg('❌ Not enough energy for specific card:', foundCard.name, 'Cost:', foundCard.cost, 'Energy:', remainingEnergy);
-      return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
-    }
-    
-    dbg('✅ Playing specific card:', foundCard.name);
-    
-    // Play just this one card
-    return playSingleOpponentCard(foundCard, currentOpponent, currentPlayer, currentBattleState, remainingEnergy, log);
+  if (!canPlayCardWithConditions(handCard, currentBattleState, lastTurnDamagePrevented)) {
+    dbg('Specified card fails conditional checks:', handCard.name);
+    return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
   }
-  
-  // If no specific card, use AI combination logic for full turn
-  dbg('🤖 No specific card provided, using AI combination logic...');
-  
-  // Function to calculate combination score (prefers multiple cards)
-  const calculateCombinationScore = (cards: Card[], totalCost: number): number => {
-    let score = 0;
-    
-    // Strongly prefer combinations with multiple cards
-    if (cards.length > 1) {
-      score += 1000; // Huge bonus for playing multiple cards
-    }
-    
-    // Add individual card priorities
-    cards.forEach(card => {
-      score += getCardPriority(card);
-    });
-    
-    // Bonus for using more energy (efficiency)
-    score += totalCost * 10;
-    
-    // Bonus for having diverse card types
-    const uniqueTypes = new Set(cards.flatMap(card => card.types || []));
-    if (uniqueTypes.size > 1) {
-      score += 50;
-    }
-    
-    return score;
-  };
-  
-  // Get all playable cards (cost <= remaining energy and meets play conditions)
-  const getPlayableCards = (hand: Card[], energy: number) => {
-    return hand.filter(card => 
-      card.cost <= energy && 
-      !card.unplayable && 
-      canPlayCardWithConditions(card, currentBattleState, lastTurnDamagePrevented)
-    );
-  };
-  
-  // Function to get card priority score
-  const getCardPriority = (card: Card): number => {
-    // Higher score = higher priority
-    let priority = 0;
-    
-    // 1: Special condition cards when conditions are met - ULTRA HIGH PRIORITY (almost mandatory)
-    if (battleState) {
-      // Check if damage was prevented last turn (look for Evasive logs in battleLog)
-      const lastTurnDamagePrevented = battleState.battleLog.some(logEntry => 
-        logEntry.includes("'s Evasive prevented") && logEntry.includes("from")
-      );
-      
-      // Booby Trap - ultra high priority if condition met
-      if (card.id === 'goblin_booby_trap' && lastTurnDamagePrevented) {
-        priority += 2000; // Ultra high priority - almost mandatory
-      }
-      
-      // Killing Instinct - ultra high priority if target is bleeding
-      if (card.id === 'beast_hunters_instinct') {
-        const bleedingEffect = (currentBattleState.playerMods || []).find(m => m.type === ModType.BLEEDING && m.stacks > 0);
-        if (bleedingEffect) {
-          priority += 2000; // Ultra high priority - almost mandatory
-        }
-      }
-      
-      // Rogue Backstab - ultra high priority if it's the first card
-      if (card.id === 'rogue_backstab' && currentBattleState.opponentPlayedCards.length === 0) {
-        priority += 2000; // Ultra high priority when condition met
-      }
-      
-      // Wizard Arcane Power - high priority if player has spell cards
-      if (card.id === 'wizard_arcane_power') {
-        const hasSpellCards = currentBattleState.opponentHand.some(c => 
-          c.class === PlayerClass.WIZARD && c.types && c.types.includes(CardType.ATTACK)
-        );
-        if (hasSpellCards) {
-          priority += 1500; // Very high priority when useful
-        }
-      }
-    }
-    
-    // 2: Volatile card - HIGH PRIORITY (but conditional for Goblin Hunter)
-    if (card.types && card.types.includes(CardType.VOLATILE)) {
-      // For Cower cards, only prioritize if health is low
-      if (card.id === 'goblin_cower_volatile') {
-        const opponentHealthPercent = currentOpponent.health / currentOpponent.maxHealth;
-        if (opponentHealthPercent < 0.5) {
-          priority += 1000; // High priority when health is low
-        } else {
-          priority += 200; // Low priority when health is high
-        }
-      } else {
-        priority += 800; // Normal volatile priority for other cards
-      }
-    }
-    
-    // 3: More card possible (cards that enable multi-card plays) - MEDIUM-HIGH PRIORITY
-    if (card.cost <= 1) {
-      priority += 600; // Low cost cards enable playing more cards
-    }
-    
-    // 4: Non attack cards - MEDIUM PRIORITY
-    if (card.types && !card.types.includes(CardType.ATTACK)) {
-      priority += 400;
-    }
-    
-    // 5: Attack card with effect - MEDIUM-LOW PRIORITY
-    if (card.types && card.types.includes(CardType.ATTACK) && card.effects && card.effects.length > 0) {
-      priority += 200;
-    }
-    
-    // 6: Simple damage attack card - LOWEST PRIORITY
-    if (card.types && card.types.includes(CardType.ATTACK) && (!card.effects || card.effects.length === 0)) {
-      priority += 0;
-    }
-    
-    // Additional modifiers for better decision making
-    // Special cards (rare) get high priority
-    if (card.rarity === Rarity.RARE || card.rarity === Rarity.SPECIAL) {
-      priority += 50;
-    }
-    
-    // Goblin Hunter specific adjustments
-    if (card.id === 'goblin_cower') {
-      const opponentHealthPercent = currentOpponent.health / currentOpponent.maxHealth;
-      if (opponentHealthPercent < 0.3) {
-        priority += 600; // High priority when health is very low
-      } else if (opponentHealthPercent < 0.5) {
-        priority += 300; // Medium priority when health is low
-      } else {
-        priority += 100; // Low priority when health is high
-      }
-    }
-    
-    // Lower cost cards get slight priority (for playing more cards)
-    priority += (3 - card.cost) * 5;
-    
-    return priority;
-  };
-  
-  // Sort cards by priority (highest first)
-  const sortCardsByPriority = (cards: Card[]) => {
-    return [...cards].sort((a, b) => getCardPriority(b) - getCardPriority(a));
-  };
-  
-  // Try to find the best combination for the entire turn (maximize multi-card plays)
-  const findBestTurnCombination = () => {
-    const playableCards = getPlayableCards(currentBattleState.opponentHand, remainingEnergy);
-    
-    if (playableCards.length === 0) {
-      return { combination: [], energyUsed: 0 };
-    }
-    
-    const sortedCards = sortCardsByPriority(playableCards);
-    let bestCombination: Card[] = [];
-    let bestEnergyUsed = 0;
-    let bestScore = 0;
-    
-    // Try two-card combinations first (STRONGLY PREFERRED)
-    for (let i = 0; i < sortedCards.length; i++) {
-      for (let j = i + 1; j < sortedCards.length; j++) {
-        const totalCost = sortedCards[i].cost + sortedCards[j].cost;
-        if (totalCost <= remainingEnergy) {
-          const combinationScore = calculateCombinationScore([sortedCards[i], sortedCards[j]], totalCost);
-          if (combinationScore > bestScore) {
-            bestCombination = [sortedCards[i], sortedCards[j]];
-            bestEnergyUsed = totalCost;
-            bestScore = combinationScore;
-          }
-        }
-      }
-    }
-    
-    // Only try single cards if no two-card combination found
-    if (bestCombination.length === 0) {
-      for (const card of sortedCards) {
-        if (card.cost <= remainingEnergy) {
-          const combinationScore = calculateCombinationScore([card], card.cost);
-          if (combinationScore > bestScore) {
-            bestCombination = [card];
-            bestEnergyUsed = card.cost;
-            bestScore = combinationScore;
-          }
-        }
-      }
-    }
-    
-    return { combination: bestCombination, energyUsed: bestEnergyUsed };
-  };
-  
-  // Play cards in optimal combinations
-  while (remainingEnergy > 0) {
-    const { combination, energyUsed } = findBestTurnCombination();
-    
-    if (combination.length === 0) {
-      dbg('No more playable cards with remaining energy:', remainingEnergy);
-      break;
-    }
-    
-    dbg('Playing combination:', combination.map(c => c.name), 'Energy used:', energyUsed);
-    
-    // Play the selected combination
-    for (const cardToPlay of combination) {
-      dbg('Playing card:', cardToPlay);
-      const result = playOneCard('opponent', cardToPlay, currentPlayer, currentOpponent, currentBattleState, log);
-      currentPlayer = result.newPlayer;
-      currentOpponent = result.newOpponent;
-      currentBattleState = result.newBattleState;
-      // Update remainingEnergy from battle state to stay in sync with helper deductions
-      remainingEnergy = currentBattleState.opponentEnergy;
-    }
-  }
-  
-  if (log.length === 0) {
-    log.push(formatLogText('Opponent skips turn', player.class, opponent.name));
-  }
-  
-  return { newPlayer: currentPlayer, newOpponent: currentOpponent, newBattleState: currentBattleState, log };
+
+  // Play exactly this one card; all effect resolution and logging are handled by playOneCard
+  dbg('Playing specified card from OpponentAI:', handCard.name);
+  const { newPlayer, newOpponent, newBattleState, log: playLog } = playSingleOpponentCard(
+    handCard,
+    currentOpponent,
+    currentPlayer,
+    currentBattleState,
+    remainingEnergy,
+    log
+  );
+
+  return { newPlayer, newOpponent, newBattleState, log: playLog };
 }
 
 

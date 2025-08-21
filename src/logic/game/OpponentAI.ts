@@ -64,6 +64,20 @@ export class OpponentAI {
     }
   };
 
+  /** Detect whether a card should be treated as "volatile" (must-play ASAP). */
+  protected isVolatile(card: Card): boolean {
+    const anyCard: any = card as any;
+    // Common ways a card may mark volatility across content definitions
+    if (anyCard?.volatile === true || anyCard?.isVolatile === true) return true;
+    const buckets = [anyCard?.keywords, anyCard?.tags, anyCard?.traits];
+    for (const b of buckets) {
+      if (Array.isArray(b) && b.some((t: any) => typeof t === 'string' && t.toLowerCase() === 'volatile')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Decide which cards to play given the current hand, energy and combat state.
    * Returns an ordered list of cards to play.  You should re‑invoke this
@@ -87,6 +101,32 @@ export class OpponentAI {
       return !cond || cond(state, opponent, player);
     });
     if (playable.length === 0) return [];
+
+    // Step 0: play any VOLATILE cards first if they are playable within current energy
+    const volatilePlayable = playable.filter(c => this.isVolatile(c));
+    if (volatilePlayable.length > 0) {
+      // Greedily pick volatile cards that fit within energy, preferring lower cost and higher priority
+      const sortedVolatile = [...volatilePlayable].sort((a, b) => {
+        if (a.cost !== b.cost) return a.cost - b.cost; // cheaper first
+        return this.cardPriority(b) - this.cardPriority(a); // then higher priority
+      });
+      const chosenVolatile: Card[] = [];
+      let remainingVolatile = energy;
+      for (const card of sortedVolatile) {
+        if (card.cost <= remainingVolatile) {
+          chosenVolatile.push(card);
+          remainingVolatile -= card.cost;
+        }
+      }
+      if (chosenVolatile.length > 0) {
+        // Order the selected volatile plays by priority desc, then cost asc
+        return chosenVolatile.sort((a, b) => {
+          const pa = this.cardPriority(a);
+          const pb = this.cardPriority(b);
+          return pb - pa || a.cost - b.cost;
+        });
+      }
+    }
 
     // Step 1: pick cards satisfying empowering conditions
     const empowered = playable.filter(card => {
