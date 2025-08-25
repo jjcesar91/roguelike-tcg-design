@@ -17,9 +17,10 @@ import { SplashScreen } from './game/shared/SplashScreen';
 import { StartingSplashScreen } from './game/shared/StartingSplashScreen';
 import { OpponentCardPreview } from './game/battle/OpponentCardPreview';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { GamePhase, PlayerClass, Difficulty, Turn } from '@/types/game';
+import { GamePhase, PlayerClass, Difficulty, Turn, Player } from '@/types/game';
 import { OpponentAI } from '@/logic/game/OpponentAI';
 import { playerClasses } from '@/data/gameData';
+import { db } from '@/lib/db';
 
 export default function Game() {
   const {
@@ -63,14 +64,31 @@ export default function Game() {
     setShowDiscardModal
   } = useModalState();
 
+
+  const handleClassSelect = (playerClass: PlayerClass) => {
+    try {
+      dbg('🚀 handleClassSelect called with:', playerClass);
+
+      // 1) Initialize the run (player only)
+      const init = GameEngine.initRun(playerClass);
+      updatePlayer(init.player);
+      setSelectedClass(playerClass);
+
+      // 2) Start the first battle at BASIC difficulty via centralized flow
+      startBattleWithSplash(init.player,Difficulty.BASIC);
+    } catch (error) {
+      console.error('❌ Error in handleClassSelect:', error);
+    }
+  };
+
   // Small helpers & timing constants
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const PREVIEW_DELAY = 800;
   const BETWEEN_CARDS_DELAY = 400;
 
-  const startBattleWithSplash = (difficulty?: Difficulty) => {
+  const startBattleWithSplash = (player: Player, difficulty?: Difficulty) => {
     // Create the battle via centralized engine and use the returned values
-    const { player, opponent, battleState} = GameEngine.createBattle(gameStateRef.current.player!, difficulty);
+    const {opponent, battleState} = GameEngine.createBattle(player!, difficulty);
 
     if (!opponent || !battleState) {
       dbg('❌ After createBattle, opponent/battleState missing');
@@ -82,7 +100,9 @@ export default function Game() {
     updateBattleState(battleState);
 
     showBattleSplash(opponent, async () => {
+      setGamePhase(GamePhase.BATTLE);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      await sleep(500);
 
       try {
         const st = gameStateRef.current;
@@ -113,27 +133,15 @@ export default function Game() {
         if (turn === Turn.OPPONENT) {
           dbg('Opponent starts — triggering AI turn');
           playOpponentTurn();
+
+          dbg('Opponent turn processing complete');
+          const newTurn = endTurn();
+          startNextTurn(newTurn!);
         }
       } catch (e) {
         dbg('battleBegin error:', e as any);
       }
     });
-  };
-
-  const handleClassSelect = (playerClass: PlayerClass) => {
-    try {
-      dbg('🚀 handleClassSelect called with:', playerClass);
-
-      // 1) Initialize the run (player only)
-      const init = GameEngine.initRun(playerClass);
-      updatePlayer(init.player);
-      setSelectedClass(playerClass);
-
-      // 2) Start the first battle at BASIC difficulty via centralized flow
-      startBattleWithSplash(Difficulty.BASIC);
-    } catch (error) {
-      console.error('❌ Error in handleClassSelect:', error);
-    }
   };
 
   // Simplified, sequential opponent turn without nested setTimeout chains
@@ -151,8 +159,13 @@ export default function Game() {
 
     // Loop until no playable cards
     while (true) {
+      dbg('Opponent AI deciding plays...');
+      dbg('Opponent energy:', bs.opponentEnergy);
+      dbg('Opponent hand:', bs.opponentHand.map(c => c.name).join(', '));
       const plays = ai.decidePlays(bs.opponentHand, bs.opponentEnergy, bs, op, pl);
       if (!plays || plays.length === 0) break;
+
+      dbg(`Opponent AI decided to play ${plays.length} card(s):`, plays.map(c => c.name).join(', '));
 
       // Always play cards one by one, recomputing after each play
       const card = plays[0];
@@ -179,31 +192,9 @@ export default function Game() {
       if (GameEngine.checkDefeat(pl)) { handleDefeat(); return; }
 
       await sleep(BETWEEN_CARDS_DELAY);
+
     }
 
-    // End opponent turn when no cards are left to play
-    const end = await GameEngine.endTurn(bs, pl, op);
-    bs = end.newBattleState;
-    pl = end.newPlayer;
-    op = end.newOpponent;
-    updateBattleState(bs);
-    updatePlayer(pl);
-    updateOpponent(op);
-
-    // Immediately start the player's next turn (no extra draws elsewhere).
-    try {
-      const startedNext = await (GameEngine as any).startTurn?.('player', pl, op, bs);
-      if (startedNext && startedNext.battleState) {
-        bs = startedNext.battleState;
-        pl = startedNext.player ?? pl;
-        op = startedNext.opponent ?? op;
-        updateBattleState(bs);
-        updatePlayer(pl);
-        updateOpponent(op);
-      }
-    } catch (err) {
-      dbg('startTurn(player) after opponent endTurn failed:', err as any);
-    }
   }, [gameStateRef, updateBattleState, updateOpponent, updateOpponentCardPreview, updatePlayer, handleVictory, handleDefeat]);
 
   const handleCardPlay = (card: any) => {
@@ -238,11 +229,12 @@ export default function Game() {
     dbg('=== GAME COMPONENT CARD PLAY COMPLETE ===');
   };
 
-  const handleEndTurn = async () => {
-    dbg('handleEndTurn called');
+  const endTurn = () => {
+
     if (!gameState.battleState || !gameState.player || !gameState.currentOpponent) return;
 
-    const { newBattleState, newPlayer, newOpponent, isOpponentTurn } = await GameEngine.endTurn(
+
+    const { newBattleState, newPlayer, newOpponent, isOpponentTurn } = GameEngine.endTurn(
       gameState.battleState,
       gameState.player,
       gameState.currentOpponent
@@ -254,14 +246,20 @@ export default function Game() {
     updatePlayer(newPlayer);
     updateOpponent(newOpponent);
 
-    if (isOpponentTurn) {
+    return { newBattleState, newPlayer, newOpponent, isOpponentTurn };
+
+  }
+
+  const startNextTurn = (newTurn: any) => {
+
+    if (newTurn.isOpponentTurn) {
       // Prepare the opponent's start-of-turn (draws + triggers), then run the AI loop.
       try {
-        const started = await (GameEngine as any).startTurn?.('opponent', newPlayer, newOpponent, newBattleState);
+        const started = GameEngine.startTurn?.('opponent', newTurn.newPlayer, newTurn.newOpponent, newTurn.newBattleState);
         if (started && started.battleState) {
           updateBattleState(started.battleState);
-          updatePlayer(started.player ?? newPlayer);
-          updateOpponent(started.opponent ?? newOpponent);
+          updatePlayer(started.player ?? newTurn.newPlayer);
+          updateOpponent(started.opponent ?? newTurn.newOpponent);
         }
       } catch (err) {
         dbg('startTurn(opponent) after player endTurn failed:', err as any);
@@ -269,7 +267,28 @@ export default function Game() {
       setTimeout(() => {
         playOpponentTurn();
       }, 300);
+    }else{
+      // Prepare the player's start-of-turn (draws + triggers)
+      try {
+        const started = GameEngine.startTurn?.('player', newTurn.newPlayer, newTurn.newOpponent, newTurn.newBattleState);
+        if (started && started.battleState) {
+          updateBattleState(started.battleState);
+          updatePlayer(started.player ?? newTurn.newPlayer);
+          updateOpponent(started.opponent ?? newTurn.newOpponent);
+        }
+      } catch (err) {
+        dbg('startTurn(player) after opponent endTurn failed:', err as any);
+      }
     }
+
+  }
+
+  const handleEndTurn = async () => {
+    dbg('handleEndTurn called');
+
+    const newTurn = endTurn();
+    startNextTurn(newTurn!);
+
   };
 
   const handleCardSelect = (card: any) => {
@@ -290,7 +309,7 @@ export default function Game() {
     setSelectedReplaceCard(null);
 
     // Start the next battle using centralized flow (difficulty inferred from state)
-    startBattleWithSplash();
+    startBattleWithSplash(newPlayer,Difficulty.next(gameState.currentOpponent?.difficulty!)!);
   };
 
   const handlePassiveSelect = (passive: any) => {
@@ -306,7 +325,7 @@ export default function Game() {
     setSelectedPassive(null);
 
     // Start the next battle using centralized flow (difficulty inferred from state)
-    startBattleWithSplash();
+    startBattleWithSplash(newPlayer,Difficulty.next(gameState.currentOpponent?.difficulty!)!);
   };
 
   const handleRestart = () => {
@@ -320,7 +339,7 @@ export default function Game() {
 
   const canPlayCard = (card: any) => {
     if (!gameState.player || !gameState.battleState) return false;
-    return GameEngine.canPlayCard(card, gameState.player, gameState.battleState);
+    return GameEngine.canPlayCard(card, gameState.battleState);
   };
 
   return (

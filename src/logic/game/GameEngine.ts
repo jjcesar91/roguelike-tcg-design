@@ -274,8 +274,8 @@ export class GameEngine {
     return checkDefeat(player);
   }
 
-  static canPlayCard(card: Card, player: Player, battleState: BattleState) {
-    return BattleHandler.canPlayCard(card, player, battleState);
+  static canPlayCard(card: Card, battleState: BattleState) {
+    return BattleHandler.canPlayCard(card, battleState);
   }
 
 }

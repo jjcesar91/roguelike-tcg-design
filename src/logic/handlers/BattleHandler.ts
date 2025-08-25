@@ -101,8 +101,8 @@ export class BattleHandler {
     };
   }
 
-  static canPlayCard(card: Card, player: Player, battleState: BattleState) {
-    return canPlayCardUtil(card, player, battleState.playerEnergy, battleState);
+  static canPlayCard(card: Card, battleState: BattleState) {
+    return canPlayCardUtil(card, battleState.playerEnergy, battleState);
   }
 
   static canOpponentPlayCard(card: Card, battleState: BattleState) {

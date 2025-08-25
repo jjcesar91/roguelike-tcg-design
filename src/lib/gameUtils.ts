@@ -18,6 +18,7 @@ import { EffectCode } from "@/content/modules/effects";
 import * as gameData from '@/data/gameData';
 import { runCardEffects } from '@/content/modules/effects';
 import { consumeModStacks } from '@/logic/core/StatusManager';
+import { db } from './db';
 
 
 dbg('gameUtils.ts loaded');
@@ -339,11 +340,11 @@ export function calculateRiposteDamage(card: Card, player: Player, battleState: 
   return (card.attack || 0) + (battleState.playerBlock || 0);
 }
 
-export function calculateCardBlock(card: Card, player: Player): number {
+export function calculateCardBlock(card: Card): number {
   return card.defense || 0;
 }
 
-export function getCardCost(card: Card, player: Player): number {
+export function getCardCost(card: Card): number {
   return card.cost;
 }
 
@@ -886,14 +887,14 @@ export function formatLogText(text: string, playerClass: PlayerClass = PlayerCla
   return formattedText;
 }
 
-export function canPlayCard(card: Card, player: Player, energy: number, battleState?: BattleState): boolean {
+export function canPlayCard(card: Card, energy: number, battleState?: BattleState): boolean {
   // Unplayable cards cannot be played
   if (card.unplayable) {
     return false;
   }
   
   // Check energy cost
-  const cost = getCardCost(card, player);
+  const cost = getCardCost(card);
   if (energy < cost) {
     return false;
   }
@@ -919,101 +920,126 @@ function playOneCard(
   battleState: BattleState,
   log: string[]
 ): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState } {
+  dbg(`${side === 'player' ? 'Player' : 'Opponent'} is attempting to play a card...`);
   const isPlayer = side === 'player';
 
   let newPlayer = { ...player };
   let newOpponent = { ...opponent };
-  const newBattleState = { ...battleState };
 
-  // 1) Remove the card from the correct hand and place in discard unless volatile
+  // Deep-clone only the arrays we mutate
+  const newBattleState: BattleState = {
+    ...battleState,
+    playerHand: [...battleState.playerHand],
+    opponentHand: [...battleState.opponentHand],
+    playerDiscardPile: [...battleState.playerDiscardPile],
+    opponentDiscardPile: [...battleState.opponentDiscardPile],
+    playerPlayedCards: [...battleState.playerPlayedCards],
+    opponentPlayedCards: [...battleState.opponentPlayedCards],
+  };
+
   const hand = isPlayer ? newBattleState.playerHand : newBattleState.opponentHand;
-  const discard = isPlayer ? 'playerDiscardPile' : 'opponentDiscardPile' as const;
-  const played = isPlayer ? 'playerPlayedCards' : 'opponentPlayedCards' as const;
+  const discardKey = isPlayer ? 'playerDiscardPile' : 'opponentDiscardPile';
+  const playedKey  = isPlayer ? 'playerPlayedCards' : 'opponentPlayedCards';
 
-  // Track if this is the first card played this turn
-  const wasFirst = (isPlayer ? newBattleState.playerPlayedCards.length : newBattleState.opponentPlayedCards.length) === 0;
+  const wasFirst = newBattleState[playedKey].length === 0;
 
+  dbg(`${isPlayer ? 'Player' : 'Opponent'} is playing card:`, card);
+  dbg('Current hand:', hand);
+  dbg('Current energy:', isPlayer ? newBattleState.playerEnergy : newBattleState.opponentEnergy);
+  dbg('Was first card this turn:', wasFirst);
+
+  // 1) Remove from hand (if there) and pre-discard unless VOLATILE
+  let playedCard = card;
   const idx = hand.findIndex(c => c.id === card.id);
-  if (idx !== -1) {
+  dbg('Card index in hand:', idx);
+  if (idx >= 0) {
     const [removed] = hand.splice(idx, 1);
-    const isVolatile = !!removed.types?.includes(CardType.VOLATILE);
+    playedCard = removed ?? card;
+    dbg('Removed card from hand:', removed);
+    dbg('Updated hand after removal:', hand);
+
+    const isVolatile = !!playedCard.types?.includes(CardType.VOLATILE);
     if (!isVolatile) {
-      (newBattleState[discard] as Card[]) = [...(newBattleState[discard] as Card[]), removed];
+      newBattleState[discardKey] = [...newBattleState[discardKey], playedCard];
+      dbg('Card added to discard pile:', newBattleState[discardKey]);
     } else {
-      log.push(formatLogText(`${isPlayer ? newPlayer.class : newOpponent.name}'s ${removed.name} was burned and removed from game!`, newPlayer.class, newOpponent.name, removed.name));
+      log.push(
+        formatLogText(
+          `${isPlayer ? newPlayer.class : newOpponent.name}'s ${playedCard.name} was burned and removed from game!`,
+          newPlayer.class, newOpponent.name, playedCard.name
+        )
+      );
+      dbg('Card is volatile and removed from game:', playedCard);
+    }
+  } else {
+    // If you *don’t* want to allow out-of-hand plays, bail here:
+    // log.push(`Tried to play ${card.name} but it wasn't in hand.`);
+    // return { newPlayer, newOpponent, newBattleState };
+    dbg('Card not found in hand, proceeding with provided card object:', card);
+  }
+
+  // 2) Pay energy (effects run later)
+  let costToPay = getCardCost(playedCard);
+  if (wasFirst) {
+    if (isPlayer && (newBattleState as any).__firstCardFreePlayer) {
+      costToPay = 0; (newBattleState as any).__firstCardFreePlayer = false;
+    }
+    if (!isPlayer && (newBattleState as any).__firstCardFreeOpponent) {
+      costToPay = 0; (newBattleState as any).__firstCardFreeOpponent = false;
     }
   }
+  if (isPlayer) newBattleState.playerEnergy = Math.max(0, newBattleState.playerEnergy - costToPay);
+  else newBattleState.opponentEnergy = Math.max(0, newBattleState.opponentEnergy - costToPay);
 
-  // 2) Energy deduction (effects are run later, after damage)
-  let costToPay = getCardCost(card, newPlayer);
-  if (isPlayer && (newBattleState as any).__firstCardFreePlayer && wasFirst) {
-    costToPay = 0; (newBattleState as any).__firstCardFreePlayer = false;
-  }
-  if (!isPlayer && (newBattleState as any).__firstCardFreeOpponent && wasFirst) {
-    costToPay = 0; (newBattleState as any).__firstCardFreeOpponent = false;
-  }
-  if (isPlayer) newBattleState.playerEnergy -= costToPay; else newBattleState.opponentEnergy -= costToPay;
+  // Push to played stack
+  newBattleState[playedKey] = [...newBattleState[playedKey], playedCard];
 
-  // Push to played stack now
-  (isPlayer ? newBattleState.playerPlayedCards : newBattleState.opponentPlayedCards).push(card);
-
-  // 3) Apply ATTACK (damage last) via unified resolver
-  if (card.attack && card.attack > 0) {
-    resolveAndApplyDamage({
+  // 3) ATTACK (damage first)
+  let damageLanded = false;
+  if (playedCard.attack && playedCard.attack > 0) {
+    const dmgRes = resolveAndApplyDamage({
       side,
       source: 'attack',
-      baseDamage: card.attack || 0,
-      card,
+      baseDamage: playedCard.attack || 0,
+      card: playedCard,
       state: newBattleState,
       player: newPlayer,
       opponent: newOpponent,
       log,
-    });
+    }) as any;
+
+    // Prefer a returned flag if you add one; fallback to log sniffing
+    damageLanded =
+      !!dmgRes?.damageApplied ||
+      (/(?:deals\s+([1-9]\d*)\s+damage)/.test(log[log.length - 1] || '') &&
+       !/Evasive prevented damage/.test(log[log.length - 1] || ''));
   }
 
-  // 5) Now run the card's effects, but only if either the card has no attack
-  //    or its attack actually dealt damage (not fully evaded/zeroed).
-  {
-    const hasAttack = !!(card.attack && card.attack > 0);
-    let canRunEffects = !hasAttack; // if no attack, always run effects
-
-    if (hasAttack) {
-      // Check the last damage resolution outcome from the log/state we just produced.
-      // We use a conservative rule: if damage was evaded or reduced to exactly 0, skip effects.
-      // Since resolveAndApplyDamage already handled logs and state, we infer from HP/block change via a flag.
-      // To keep it robust, recompute one-shot eligibility based on most recent entry:
-      const lastLog = log[log.length - 1] || '';
-      const evadedHit = /Evasive prevented damage/.test(lastLog);
-      const zeroedHit = /deals 0 damage/.test(lastLog);
-      canRunEffects = !(evadedHit || zeroedHit);
-    }
-
-    if (canRunEffects) {
-      runCardEffects(
-        card as Card & { effects?: EffectInstance[] },
-        { side, player: newPlayer, opponent: newOpponent, state: newBattleState, log },
-        log
-      );
-    } else {
-      // Optional: diagnostic log to explain skipped effects due to no damage landing
-      // log.push(formatLogText(`${isPlayer ? newPlayer.class : newOpponent.name}'s ${card.name} effects did not trigger because the attack dealt no damage`, newPlayer.class, newOpponent.name, card.name));
-    }
+  // 5) Effects (only if no attack OR attack actually landed)
+  const canRunEffects = !(playedCard.attack && playedCard.attack > 0) || damageLanded;
+  if (canRunEffects && (playedCard as any).effects) {
+    runCardEffects(
+      playedCard as Card & { effects?: EffectInstance[] },
+      { side, player: newPlayer, opponent: newOpponent, state: newBattleState, log },
+      log
+    );
   }
 
-  // 6) Apply DEFENSE
-  if (card.defense) {
-    const block = isPlayer ? calculateCardBlock(card, newPlayer) : (card.defense || 0);
+  // 6) DEFENSE
+  if (playedCard.defense && playedCard.defense > 0) {
+    const block = calculateCardBlock(playedCard);
     if (isPlayer) {
       newBattleState.playerBlock += block;
-      log.push(formatLogText(`Player gains ${block} block from ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+      log.push(formatLogText(`Player gains ${block} block from ${playedCard.name}`, newPlayer.class, newOpponent.name, playedCard.name));
     } else {
       newBattleState.opponentBlock += block;
-      log.push(formatLogText(`${newOpponent.name} gains ${block} block with ${card.name}`, newPlayer.class, newOpponent.name, card.name));
+      log.push(formatLogText(`${newOpponent.name} gains ${block} block with ${playedCard.name}`, newPlayer.class, newOpponent.name, playedCard.name));
     }
   }
 
   return { newPlayer, newOpponent, newBattleState };
 }
+
 
 export function playCard(
   card: Card,
@@ -1022,13 +1048,27 @@ export function playCard(
   battleState: BattleState
 ): { newPlayer: Player; newOpponent: Opponent; newBattleState: BattleState; log: string[] } {
   const log: string[] = [];
-  const cost = getCardCost(card, player);
 
-  if (!canPlayCard(card, player, battleState.playerEnergy, battleState)) {
-    return { newPlayer: player, newOpponent: opponent, newBattleState: battleState, log: [formatLogText('Not enough energy or card conditions not met!', player.class, opponent.name)] };
+  const side = battleState.turn === 'player' ? 'player' : 'opponent';
+  dbg('Current turn side:', side);
+
+  // Choose actor + energy based on side
+  const energy = side === 'player' ? battleState.playerEnergy : battleState.opponentEnergy;
+  dbg(`=== PLAY CARD: ${side} plays ${card.name} (cost ${card.cost}, has ${energy} energy) ===`);
+
+  if (!canPlayCard(card, energy, battleState)) {
+    return {
+      newPlayer: player,
+      newOpponent: opponent,
+      newBattleState: battleState,
+      log: [formatLogText('Not enough energy or card conditions not met!', player.class, opponent.name)],
+    };
   }
+  dbg(`✅ Card is playable: ${card.name}`);
 
-  const { newPlayer, newOpponent, newBattleState } = playOneCard('player', card, player, opponent, battleState, log);
+  const { newPlayer, newOpponent, newBattleState } =
+    playOneCard(side, card, player, opponent, battleState, log);
+
   return { newPlayer, newOpponent, newBattleState, log };
 }
 

@@ -99,6 +99,19 @@ export enum Difficulty {
   BOSS = 'boss',
 }
 
+const ORDER: Difficulty[] = [
+  Difficulty.BASIC,
+  Difficulty.MEDIUM,
+  Difficulty.BOSS,
+];
+
+export namespace Difficulty {
+  export function next(d: Difficulty): Difficulty | null {
+    const i = ORDER.indexOf(d);
+    return ORDER[i + 1] ?? null; // or ORDER[0] for wrap-around
+  }
+}
+
 export interface Opponent {
   id: string;
   name: string;
