@@ -1,5 +1,7 @@
 import { BattleState, Card, CardType, Opponent, Player } from '@/types/game';
 import { ModType } from "@/content/modules/mods";
+import { dbg } from '@/lib/debug';
+import { db } from '@/lib/db';
 
 /**
  * Unified opponent AI for deciding which cards to play each turn.
@@ -91,9 +93,13 @@ export class OpponentAI {
     opponent: Opponent,
     player: Player
   ): Card[] {
+    dbg('=== OPPONENT AI DECIDE PLAYS DEBUG ===');
+
     // Filter out unplayable cards by cost and unplayable flag
     let playable = hand.filter(c => !c.unplayable && c.cost <= energy);
     if (playable.length === 0) return [];
+
+    dbg('playable cards:', playable);
 
     // Exclude cards whose enabling condition is not met
     playable = playable.filter(card => {
@@ -101,6 +107,8 @@ export class OpponentAI {
       return !cond || cond(state, opponent, player);
     });
     if (playable.length === 0) return [];
+
+    dbg('after enabling conditions:', playable);
 
     // Step 0: play any VOLATILE cards first if they are playable within current energy
     const volatilePlayable = playable.filter(c => this.isVolatile(c));

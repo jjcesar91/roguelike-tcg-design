@@ -1,9 +1,10 @@
 import { PlayerClass, Player, Opponent, BattleState, Card, TriggerPhase, Turn, Difficulty } from '@/types/game';
 import { BattleHandler } from '../handlers/BattleHandler';
 import { SelectionHandler } from '../handlers/SelectionHandler';
-import { createPlayer, getRandomPassives, getRandomOpponent, initializeBattle, runPhaseForSide, computeDrawCountForSide, drawCardsWithMinionEffects, formatLogText, checkVictory, checkDefeat } from '@/lib/gameUtils';
+import { createPlayer, getRandomPassives, getRandomOpponent, initializeBattle, runPhaseForSide, computeDrawCountForSide, drawHand as drawHand, formatLogText, checkVictory, checkDefeat, discardHandForSide } from '@/lib/gameUtils';
 import { EffectInstance, EffectCode } from '@/content/modules/effects';
 import { BattleEngine } from './BattleEngine';
+import { dbg } from '@/lib/debug';
 
 /**
  * GameEngine – single orchestration surface.
@@ -146,9 +147,9 @@ export class GameEngine {
       : 3) | 0;
 
     let drawn: Card[] = [];
-    if (typeof drawCardsWithMinionEffects === 'function') {
+    if (typeof drawHand === 'function') {
       // unified util: draw based on active side and battle state
-      const res = drawCardsWithMinionEffects(side, drawCount, battleState);
+      const res = drawHand(side, drawCount, battleState);
       drawn = res.drawnCards ?? [];
       // util is expected to update battleState's decks/hand, but ensure hand push as fallback
       if (!res.appliedToState) {
@@ -228,6 +229,17 @@ export class GameEngine {
         log: battleState?.battleLog ?? [],
       });
     }
+
+    //dbg('discarding hand for side:', battleState.turn === Turn.PLAYER ? 'player' : 'opponent');
+
+    discardHandForSide(
+      battleState.turn === Turn.PLAYER ? 'player' : 'opponent',
+      battleState,
+      player,
+      opponent,
+      battleState.battleLog
+    );
+
 
     // Flip turn.
     const nextSide: 'player' | 'opponent' = battleState.turn === Turn.PLAYER ? 'opponent' : 'player';

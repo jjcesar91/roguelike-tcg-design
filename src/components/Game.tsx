@@ -132,11 +132,7 @@ export default function Game() {
         // If opponent starts, immediately trigger AI loop
         if (turn === Turn.OPPONENT) {
           dbg('Opponent starts — triggering AI turn');
-          playOpponentTurn();
-
-          dbg('Opponent turn processing complete');
-          const newTurn = endTurn();
-          startNextTurn(newTurn!);
+          try { await playOpponentTurn(); } catch (e) { dbg('AI loop error:', e); }
         }
       } catch (e) {
         dbg('battleBegin error:', e as any);
@@ -156,9 +152,10 @@ export default function Game() {
 
     // Instantiate unified opponent AI
     const ai = new OpponentAI();
+    let iters = 0;
+    const MAX_ITERS = 50;
 
-    // Loop until no playable cards
-    while (true) {
+    while (iters++ < MAX_ITERS) {
       dbg('Opponent AI deciding plays...');
       dbg('Opponent energy:', bs.opponentEnergy);
       dbg('Opponent hand:', bs.opponentHand.map(c => c.name).join(', '));
@@ -170,12 +167,19 @@ export default function Game() {
       // Always play cards one by one, recomputing after each play
       const card = plays[0];
 
-      // Show preview for the chosen card
-      updateOpponentCardPreview(card, true);
-      await sleep(PREVIEW_DELAY);
-      updateOpponentCardPreview(null, false);
+      // Show preview for the chosen card, ensure it always clears
+      try {
+        updateOpponentCardPreview(card, true);
+        await sleep(PREVIEW_DELAY);
+      } finally {
+        updateOpponentCardPreview(null, false);
+      }
 
-      // Execute the card through the shared engine path
+      // Snapshot to detect stalls
+      const beforeEnergy = bs.opponentEnergy;
+      const beforeHand = bs.opponentHand.length;
+
+      // Execute the card through the shared engine path (OPPONENT side)
       const res = GameEngine.playCard(card, pl, op, bs);
 
       // Normalize and persist returned state
@@ -187,6 +191,12 @@ export default function Game() {
       updatePlayer(pl);
       updateOpponent(op);
 
+      // If no progress was made (same energy and hand size), break to avoid infinite loop
+      if (bs.opponentEnergy === beforeEnergy && bs.opponentHand.length === beforeHand) {
+        dbg('No progress (opponent hand & energy unchanged) — breaking AI loop');
+        break;
+      }
+
       // Victory/defeat checks
       if (GameEngine.checkVictory(pl, op)) { handleVictory(); return; }
       if (GameEngine.checkDefeat(pl)) { handleDefeat(); return; }
@@ -194,6 +204,16 @@ export default function Game() {
       await sleep(BETWEEN_CARDS_DELAY);
 
     }
+
+    dbg('Opponent AI turn complete after', iters, 'iterations');
+
+    const newTurn = endTurn();
+
+    dbg('After opponent turn, new turn is:', newTurn?.newBattleState.turn);
+
+    startNextTurn(newTurn!);
+
+    dbg('=== OPPONENT TURN COMPLETE ===');
 
   }, [gameStateRef, updateBattleState, updateOpponent, updateOpponentCardPreview, updatePlayer, handleVictory, handleDefeat]);
 
@@ -231,13 +251,15 @@ export default function Game() {
 
   const endTurn = () => {
 
-    if (!gameState.battleState || !gameState.player || !gameState.currentOpponent) return;
-
+    dbg('=== GAME COMPONENT END TURN DEBUG ===');
+    dbg('Current game state at endTurn:', gameStateRef);
+    if (!gameStateRef.current.battleState || !gameStateRef.current.player || !gameStateRef.current.currentOpponent) return;
+    dbg('Current turn:', gameStateRef.current.battleState.turn);
 
     const { newBattleState, newPlayer, newOpponent, isOpponentTurn } = GameEngine.endTurn(
-      gameState.battleState,
-      gameState.player,
-      gameState.currentOpponent
+      gameStateRef.current.battleState,
+      gameStateRef.current.player,
+      gameStateRef.current.currentOpponent
     );
 
     dbg('After endTurn, new turn:', newBattleState.turn);
@@ -250,38 +272,54 @@ export default function Game() {
 
   }
 
-  const startNextTurn = (newTurn: any) => {
+const startNextTurn = (newTurn: any) => {
+  
+  if (newTurn.newBattleState.turn === Turn.OPPONENT) {
+    // Replenish opponent energy to its max before start-of-turn triggers
+    try {
+      const bsWithEnergy = { ...newTurn.newBattleState } as any;
+      const opp = newTurn.newOpponent as any;
+      const maxOppEnergy =
+        (opp && (opp.maxEnergy ?? opp.energyMax)) ??
+        (newTurn.newBattleState as any)?.opponentMaxEnergy ??
+        (newTurn.newBattleState as any)?.maxOpponentEnergy ??
+        (newTurn.newBattleState as any)?.opponentEnergyMax ??
+        bsWithEnergy.opponentEnergy;
 
-    if (newTurn.isOpponentTurn) {
+      if (typeof maxOppEnergy === 'number' && Number.isFinite(maxOppEnergy)) {
+        bsWithEnergy.opponentEnergy = maxOppEnergy;
+        dbg('Replenished opponent energy to', maxOppEnergy);
+        updateBattleState(bsWithEnergy);
+      }
+
       // Prepare the opponent's start-of-turn (draws + triggers), then run the AI loop.
-      try {
-        const started = GameEngine.startTurn?.('opponent', newTurn.newPlayer, newTurn.newOpponent, newTurn.newBattleState);
-        if (started && started.battleState) {
-          updateBattleState(started.battleState);
-          updatePlayer(started.player ?? newTurn.newPlayer);
-          updateOpponent(started.opponent ?? newTurn.newOpponent);
-        }
-      } catch (err) {
-        dbg('startTurn(opponent) after player endTurn failed:', err as any);
+      const started = GameEngine.startTurn?.('opponent', newTurn.newPlayer, newTurn.newOpponent, bsWithEnergy);
+      if (started && started.battleState) {
+        updateBattleState(started.battleState);
+        updatePlayer(started.player ?? newTurn.newPlayer);
+        updateOpponent(started.opponent ?? newTurn.newOpponent);
       }
-      setTimeout(() => {
-        playOpponentTurn();
-      }, 300);
-    }else{
-      // Prepare the player's start-of-turn (draws + triggers)
-      try {
-        const started = GameEngine.startTurn?.('player', newTurn.newPlayer, newTurn.newOpponent, newTurn.newBattleState);
-        if (started && started.battleState) {
-          updateBattleState(started.battleState);
-          updatePlayer(started.player ?? newTurn.newPlayer);
-          updateOpponent(started.opponent ?? newTurn.newOpponent);
-        }
-      } catch (err) {
-        dbg('startTurn(player) after opponent endTurn failed:', err as any);
-      }
+    } catch (err) {
+      dbg('startTurn(opponent) after player endTurn failed:', err as any);
     }
-
+    setTimeout(() => {
+      playOpponentTurn();
+    }, 300);
+  } else {
+    // Prepare the player's start-of-turn (draws + triggers)
+    try {
+      const started = GameEngine.startTurn?.('player', newTurn.newPlayer, newTurn.newOpponent, newTurn.newBattleState);
+      if (started && started.battleState) {
+        updateBattleState(started.battleState);
+        updatePlayer(started.player ?? newTurn.newPlayer);
+        updateOpponent(started.opponent ?? newTurn.newOpponent);
+      }
+    } catch (err) {
+      dbg('startTurn(player) after opponent endTurn failed:', err as any);
+    }
   }
+
+}
 
   const handleEndTurn = async () => {
     dbg('handleEndTurn called');

@@ -50,7 +50,7 @@ function performDraw(
   const deck = isPlayer ? state.playerDeck : state.opponentDeck;
   const discard = isPlayer ? state.playerDiscardPile : state.opponentDiscardPile;
 
-  const drawResult = drawCardsWithMinionEffects(
+  const drawResult = drawHand(
     deck,
     discard,
     cardsToDraw,
@@ -802,6 +802,53 @@ export function triggerBeforeDraw(
   runTriggeredEffectsForPhase(TriggerPhase.BEFOREDRAW, side, battleState, player, opponent, log);
 }
 
+/**
+ * Discard the entire hand for a side into its discard pile.
+ * Volatile cards are burned (removed from game) instead of being discarded.
+ * Mutates the provided BattleState in-place and optionally logs actions.
+ */
+export function discardHandForSide(
+  side: 'player' | 'opponent',
+  battleState: BattleState,
+  player: Player,
+  opponent: Opponent,
+  log: string[] = battleState?.battleLog ?? []
+): { discarded: number; burned: number } {
+  const isPlayer = side === 'player';
+  const handKey: 'playerHand' | 'opponentHand' = isPlayer ? 'playerHand' : 'opponentHand';
+  const discardKey: 'playerDiscardPile' | 'opponentDiscardPile' = isPlayer ? 'playerDiscardPile' : 'opponentDiscardPile';
+
+  const hand = battleState[handKey] || [];
+  if (!hand.length) return { discarded: 0, burned: 0 };
+
+  // Partition cards into volatile and non-volatile
+  const volatile: Card[] = [];
+  const nonVolatile: Card[] = [];
+  for (const c of hand) {
+    if (c.types && c.types.includes(CardType.VOLATILE)) volatile.push(c);
+    else nonVolatile.push(c);
+  }
+
+  // Discard non-volatile
+  battleState[discardKey] = [...battleState[discardKey], ...nonVolatile];
+
+  dbg('cards discarded: ', nonVolatile);
+  // Clear hand
+  battleState[handKey] = [];
+  dbg('cards burned: ', volatile);
+
+  // Logs
+  const who = isPlayer ? player.class : opponent.name;
+  if (nonVolatile.length > 0) {
+    log.push(formatLogText(`${who} discards ${nonVolatile.length} card(s)`, player.class, opponent.name));
+  }
+  if (volatile.length > 0) {
+    log.push(formatLogText(`${who} burned ${volatile.length} volatile card(s)`, player.class, opponent.name));
+  }
+
+  return { discarded: nonVolatile.length, burned: volatile.length };
+}
+
 export function updateDrawModifications(modifications: DrawModification[]): DrawModification[] {
   const updated = modifications
     .map(mod => ({
@@ -1151,11 +1198,11 @@ export function opponentPlayCard(
 
 
 // Internal: original deck-based implementation
-function drawCardsWithMinionEffectsDeckInternal(
+function drawHandDeckInternal(
   deck: Deck,
   discardPile: Card[],
   numCards: number = 1,
-  targetPlayer: 'player' | 'opponent' = 'player',
+  side: 'player' | 'opponent' = 'player',
   playerClass: PlayerClass = PlayerClass.WARRIOR,
   opponentName: string = 'Alpha Wolf'
 ): { drawnCards: Card[], updatedDeck: Deck, updatedDiscardPile: Card[], minionDamageLog: string[] } {
@@ -1166,13 +1213,12 @@ function drawCardsWithMinionEffectsDeckInternal(
 
   for (let i = 0; i < numCards; i++) {
     if (currentDeck.cards.length === 0) {
-      // Shuffle discard pile back into deck
       if (currentDiscardPile.length > 0) {
         currentDeck.cards = shuffleDeck([...currentDiscardPile]);
         currentDiscardPile = [];
-        dbg('Deck empty, shuffled discard pile back into deck');
+        dbg(`${side === 'player' ? 'Player' : 'Opponent'} deck empty — reshuffled ${side === 'player' ? 'player' : 'opponent'} discard pile back into deck`);
       } else {
-        dbg('No cards left to draw');
+        dbg(`${side === 'player' ? 'Player' : 'Opponent'} has no cards left to draw`);
         break;
       }
     }
@@ -1183,7 +1229,7 @@ function drawCardsWithMinionEffectsDeckInternal(
     if (drawnCard.types?.includes(CardType.MINION) && drawnCard.unplayable && /wolf_minion/.test(drawnCard.id)) {
       const damage = drawnCard.attack || 5;
       minionDamageLog.push(formatLogText(
-        `${targetPlayer === 'player' ? playerClass : opponentName} drew Wolf and takes ${damage} damage`,
+        `${side === 'player' ? playerClass : opponentName} drew Wolf and takes ${damage} damage`,
         playerClass,
         opponentName
       ));
@@ -1202,7 +1248,7 @@ function drawCardsWithMinionEffectsDeckInternal(
 }
 
 // Router that supports both the side-based signature expected by GameEngine and the legacy deck-based signature.
-export function drawCardsWithMinionEffects(...args: any[]): any {
+export function drawHand(...args: any[]): any {
   // Side-based: (side, drawCount, battleState)
   if (typeof args[0] === 'string' && (args[0] === 'player' || args[0] === 'opponent')) {
     const side = args[0] as 'player' | 'opponent';
@@ -1214,7 +1260,7 @@ export function drawCardsWithMinionEffects(...args: any[]): any {
     const handKey = isPlayer ? 'playerHand' : 'opponentHand';
     const who = isPlayer ? 'Player' : (args[3]?.opponentName || (state as any)?.opponentName || 'Opponent');
 
-    const res = drawCardsWithMinionEffectsDeckInternal(
+    const res = drawHandDeckInternal(
       state[deckKey],
       state[discardKey],
       drawCount,
@@ -1238,14 +1284,14 @@ export function drawCardsWithMinionEffects(...args: any[]): any {
   }
 
   // Deck-based legacy signature passthrough
-  return drawCardsWithMinionEffectsDeckInternal.apply(null, args as any);
+  return drawHandDeckInternal.apply(null, args as any);
 }
 
 /**
  * Simpler side-based drawCards wrapper for GameEngine.startTurn fallback.
  */
 export function drawCards(side: 'player' | 'opponent', numCards: number, state: BattleState): Card[] {
-  return drawCardsWithMinionEffects(side, numCards, state);
+  return drawHand(side, numCards, state);
 }
 
 export function drawCardsWithReshuffle(
