@@ -1,4 +1,4 @@
-import { Card, PlayerClass } from '@/types/game'
+import { Card, PlayerClass, Opponent } from '@/types/game'
 import { EffectCode } from '../../content/modules/effects'
 import { opponents as allOpponents, playerCards, playerClasses } from '@/data/gameData'
 import Character from '../core/Character'
@@ -10,11 +10,11 @@ import Character from '../core/Character'
  */
 export class BattleEngine {
   player: Character
-  opponent: Character
+  opponent: Opponent
   turn: 'player' | 'opponent'
   log: string[] = []
 
-  private constructor(player: Character, opponent: Character, turn: 'player'|'opponent') {
+  private constructor(player: Character, opponent: Opponent, turn: 'player'|'opponent') {
     this.player = player
     this.opponent = opponent
     this.turn = turn
@@ -38,15 +38,19 @@ export class BattleEngine {
     const baseOpp = candidates[Math.floor(Math.random() * candidates.length)]
     const oppDeck: Card[] = baseOpp.deck.cards.map(c => ({ ...c }))
 
-    const opponent = new Character({
-      classOrType: baseOpp.type,
-      health: baseOpp.health,
-      maxHealth: baseOpp.maxHealth,
-      energy: 2,
-      deckCards: oppDeck,
+    const opponent: Opponent = {
+      id: baseOpp.id,
       name: baseOpp.name,
-      passives: baseOpp.passives ? [baseOpp.passives as any] : []
-    })
+      type: baseOpp.type,
+      health: baseOpp.health,
+      maxHealth: baseOpp.maxHealth ?? baseOpp.health,
+      energy: 2,
+      maxEnergy: 2,
+      portrait: baseOpp.portrait,
+      deck: { cards: oppDeck, discardPile: [] },
+      difficulty: baseOpp.difficulty,
+      passives: baseOpp.passives ?? [],
+    }
 
     // Determine first turn (ambush check by passive effect code)
     const ambush =
@@ -55,7 +59,7 @@ export class BattleEngine {
     const engine = new BattleEngine(player, opponent, ambush ? 'opponent' : 'player')
 
     if (engine.turn === 'player') {
-      engine.player.draw(3)
+      // Initial draws should be handled by the engine flow.
     } else {
       // opponent draws on their first turn in the UI flow
     }

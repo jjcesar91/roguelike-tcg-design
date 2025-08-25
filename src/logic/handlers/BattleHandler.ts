@@ -1,6 +1,7 @@
 import { dbg } from '@/lib/debug';
 import { Card, Player, Opponent, BattleState, Turn } from '@/types/game';
-import { playCard, opponentPlayCard, endTurn, checkVictory, checkDefeat, canPlayCard as canPlayCardUtil } from '@/lib/gameUtils';
+import { playCard, canPlayCard as canPlayCardUtil } from '@/lib/gameUtils';
+import { GameEngine } from '@/logic/game/GameEngine';
 
 export class BattleHandler {
   static handleCardPlay(card: Card, player: Player, opponent: Opponent, battleState: BattleState) {
@@ -18,24 +19,22 @@ export class BattleHandler {
     };
   }
 
-  static handleEndTurn(battleState: BattleState, player: Player, opponent: Opponent) {
+  static async handleEndTurn(battleState: BattleState, player: Player, opponent: Opponent) {
     dbg('handleEndTurn called');
-    
-    const { newBattleState, newPlayer, newOpponent } = endTurn(battleState, player, opponent);
-    dbg('After endTurn, new turn:', newBattleState.turn);
-    
+
+    const end = await GameEngine.endTurn(battleState, player, opponent);
+    dbg('After endTurn, new turn:', end.newBattleState.turn);
+
     return {
-      newBattleState,
-      newPlayer,
-      newOpponent,
-      isOpponentTurn: newBattleState.turn === Turn.OPPONENT
+      newBattleState: end.newBattleState,
+      newPlayer: end.newPlayer,
+      newOpponent: end.newOpponent,
+      isOpponentTurn: end.isOpponentTurn
     };
   }
 
   static handleOpponentTurn(opponent: Opponent, player: Player, battleState: BattleState) {
-    dbg('Starting opponent turn with sequential card playing...');
-    
-    // Return immediately with the initial state - the actual card playing will be handled sequentially
+    dbg('Starting opponent turn (AI-driven in component).');
     return {
       newPlayer: player,
       newOpponent: opponent,
@@ -60,16 +59,15 @@ export class BattleHandler {
     });
 
     if (cardIndex >= playableCards.length) {
-      // No more cards to play, end the turn
+      // No more cards to play, end the turn via centralized engine
       dbg('No more cards to play, ending opponent turn');
-      const { newBattleState: finalBattleState, newPlayer: finalPlayer, newOpponent: finalOpponent } = endTurn(battleState, player, opponent);
-      
+      const end = GameEngine.endTurn(battleState, player, opponent);
       return {
-        newPlayer: finalPlayer,
-        newOpponent: finalOpponent,
-        newBattleState: finalBattleState,
-        isVictory: checkVictory(finalPlayer, finalOpponent),
-        isDefeat: checkDefeat(finalPlayer),
+        newPlayer: end.newPlayer,
+        newOpponent: end.newOpponent,
+        newBattleState: end.newBattleState,
+        isVictory: GameEngine.checkVictory(end.newPlayer, end.newOpponent),
+        isDefeat: GameEngine.checkDefeat(end.newPlayer),
         shouldContinue: false
       };
     }

@@ -12,6 +12,8 @@ export const opponents: Opponent[] = [
     type: OpponentType.MONSTER,
     health: 30,
     maxHealth: 30,
+    energy: 2,
+    maxEnergy: 2,
     portrait: "https://i.imgur.com/tN5et02.jpeg",
     deck: {
       cards: [
@@ -37,6 +39,8 @@ export const opponents: Opponent[] = [
     type: OpponentType.BEAST,
     health: 42,
     maxHealth: 42,
+    energy: 2,
+    maxEnergy: 2,
     portrait: "https://i.imgur.com/0TFnwFH.png",
     deck: {
       cards: [
@@ -62,6 +66,8 @@ export const opponents: Opponent[] = [
     type: OpponentType.UNDEAD,
     health: 40,
     maxHealth: 40,
+    energy: 2,
+    maxEnergy: 2,
     portrait: "https://i.imgur.com/E36FymH.jpeg",
     deck: {
       cards: [
@@ -79,6 +85,8 @@ export const opponents: Opponent[] = [
     type: OpponentType.ROGUE,
     health: 45,
     maxHealth: 45,
+    energy: 2,
+    maxEnergy: 2,
     portrait: "https://i.imgur.com/dXzCZbO.jpeg",
     deck: {
       cards: [
@@ -96,6 +104,8 @@ export const opponents: Opponent[] = [
     type: OpponentType.MONSTER,
     health: 60,
     maxHealth: 60,
+    energy: 2,
+    maxEnergy: 2,
     portrait: "https://i.imgur.com/BM04nJa.png",
     deck: {
       cards: [
@@ -113,6 +123,8 @@ export const opponents: Opponent[] = [
     type: OpponentType.UNDEAD,
     health: 65,
     maxHealth: 65,
+    energy: 2,
+    maxEnergy: 2,
     portrait: "https://i.imgur.com/P1VfO0A.jpeg",
     deck: {
       cards: [

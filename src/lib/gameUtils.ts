@@ -1,3 +1,14 @@
+// ---- UTILS FOR SIDE-BASED DRAW AND PHASE HANDLING ----
+
+/**
+ * Compute the number of cards to draw for a given side, applying draw modifications.
+ */
+export function computeDrawCountForSide(side: 'player' | 'opponent', state: BattleState, base: number = 3): number {
+  const mods = side === 'player' ? (state.playerDrawModifications || []) : (state.opponentDrawModifications || []);
+  return calculateModifiedDrawCount(base, mods);
+}
+export const getDrawCountForSide = computeDrawCountForSide;
+
 import { dbg } from '@/lib/debug';
 import { BattleState, Card, CardType, Deck, DrawModification, Rarity, GameState, Turn, Opponent, Player, PlayerClass, OpponentType, DrawModType, Difficulty, TriggerPhase, Passive } from '@/types/game';
 import { ActiveMod, MOD_DEFS, ModType } from "@/content/modules/mods";
@@ -57,6 +68,12 @@ function performDraw(
     state.opponentDiscardPile = drawResult.updatedDiscardPile;
   }
 
+  // Trigger ONCARDRAW effects for each drawn card
+  for (let i = 0; i < drawResult.drawnCards.length; i++) {
+    runModEffectsForPhase(side, state, player, opponent, TriggerPhase.ONCARDRAW, logSink);
+    runTriggeredEffectsForPhase(TriggerPhase.ONCARDRAW, side, state, player, opponent, logSink);
+  }
+
   if (drawModificationLog) {
     logSink.push(formatLogText(drawModificationLog, player.class, opponent.name));
   }
@@ -107,6 +124,8 @@ function performDraw(
 
 
 
+
+
 type ModSide = 'player' | 'opponent';
 
 function resolveModEffectParams(base: any, mod: ActiveMod, side: ModSide): any {
@@ -118,6 +137,10 @@ function resolveModEffectParams(base: any, mod: ActiveMod, side: ModSide): any {
   return p;
 }
 
+/**
+ * Execute all MOD effects for a given side and trigger phase.
+ * Builds a pseudo-card so the standard effect runner can mutate attack/params.
+ */
 function runModEffectsForPhase(
   side: ModSide,
   state: BattleState,
@@ -140,12 +163,37 @@ function runModEffectsForPhase(
         class: player.class,
         rarity: Rarity.COMMON,
         types: [],
-        effects: [ { ...eff, params } ],
+        effects: [{ ...eff, params }],
       };
       runCardEffects(pseudo, { side, player, opponent, state, log }, log);
     }
   }
 }
+
+/**
+ * Run all effects for a phase for a given side (mods, then passives).
+ * Used by GameEngine.startTurn as a dynamic import fallback.
+ */
+export function runPhaseForSide(
+  phase: TriggerPhase,
+  ctx: { side: 'player' | 'opponent'; state: BattleState; player: Player; opponent: Opponent; log?: string[]; card?: Card }
+) {
+  const { side, state, player, opponent, log } = ctx;
+  const sink = log || (state?.battleLog || []);
+
+  if (phase === TriggerPhase.BEFOREDRAW) {
+    return triggerBeforeDraw(side, state, player, opponent, sink);
+  }
+
+  // For all other phases, run mod effects first, then passives
+  runModEffectsForPhase(side, state, player, opponent, phase, sink);
+  runTriggeredEffectsForPhase(phase, side, state, player, opponent, sink);
+}
+
+// Back-compat aliases so the dynamic import can find any of these names.
+export const runPhase = runPhaseForSide;
+export const runTriggeredPhase = runPhaseForSide;
+export const runTriggeredEffects = runPhaseForSide;
 
 export function createDeck(cards: Card[], copies: number = 3): Deck {
   const deck: Card[] = [];
@@ -261,7 +309,7 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
   const provisionalState: BattleState = {
     playerHand: [],
     playerEnergy: player.maxEnergy,
-    opponentEnergy: 2,
+    opponentEnergy: opponent.maxEnergy,
     opponentHand: [],
     turn: firstTurn,
     playerPlayedCards: [],
@@ -279,18 +327,6 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
     opponentDrawModifications: [],
     battleLog
   };
-
-  // --- BEFORE DRAW phase ---
-  triggerBeforeDraw(
-    openingSide,
-    provisionalState,
-    player,
-    opponent,
-    provisionalState.battleLog
-  );
-
-  // Perform opening draw for the side who starts
-  performDraw(openingSide, provisionalState, player, opponent, provisionalState.battleLog);
 
   return provisionalState;
 }
@@ -1029,7 +1065,7 @@ export function opponentPlayCard(
   // Opponent energy should already be set by turn flow; default to 2 as a fallback.
   const remainingEnergy = typeof currentBattleState.opponentEnergy === 'number'
     ? currentBattleState.opponentEnergy
-    : 2;
+    : currentOpponent.maxEnergy;
 
   // If no specific card is provided, this function does NOT decide what to play anymore.
   // Higher-level AI (OpponentAI.decidePlays) must choose the card and pass it here.
@@ -1074,9 +1110,10 @@ export function opponentPlayCard(
 
 
 
-export function drawCardsWithMinionEffects(
-  deck: Deck, 
-  discardPile: Card[], 
+// Internal: original deck-based implementation
+function drawCardsWithMinionEffectsDeckInternal(
+  deck: Deck,
+  discardPile: Card[],
   numCards: number = 1,
   targetPlayer: 'player' | 'opponent' = 'player',
   playerClass: PlayerClass = PlayerClass.WARRIOR,
@@ -1086,7 +1123,7 @@ export function drawCardsWithMinionEffects(
   let currentDeck = { ...deck };
   let currentDiscardPile = [...discardPile];
   const minionDamageLog: string[] = [];
-  
+
   for (let i = 0; i < numCards; i++) {
     if (currentDeck.cards.length === 0) {
       // Shuffle discard pile back into deck
@@ -1099,9 +1136,9 @@ export function drawCardsWithMinionEffects(
         break;
       }
     }
-    
+
     const drawnCard = currentDeck.cards.shift()!;
-    
+
     // Check if this is a Wolf minion card
     if (drawnCard.types?.includes(CardType.MINION) && drawnCard.unplayable && /wolf_minion/.test(drawnCard.id)) {
       const damage = drawnCard.attack || 5;
@@ -1115,13 +1152,60 @@ export function drawCardsWithMinionEffects(
       drawnCards.push(drawnCard);
     }
   }
-  
+
   return {
     drawnCards,
     updatedDeck: currentDeck,
     updatedDiscardPile: currentDiscardPile,
     minionDamageLog
   };
+}
+
+// Router that supports both the side-based signature expected by GameEngine and the legacy deck-based signature.
+export function drawCardsWithMinionEffects(...args: any[]): any {
+  // Side-based: (side, drawCount, battleState)
+  if (typeof args[0] === 'string' && (args[0] === 'player' || args[0] === 'opponent')) {
+    const side = args[0] as 'player' | 'opponent';
+    const drawCount: number = (args[1] as number) ?? 1;
+    const state: BattleState = args[2] as BattleState;
+    const isPlayer = side === 'player';
+    const deckKey = isPlayer ? 'playerDeck' : 'opponentDeck';
+    const discardKey = isPlayer ? 'playerDiscardPile' : 'opponentDiscardPile';
+    const handKey = isPlayer ? 'playerHand' : 'opponentHand';
+    const who = isPlayer ? 'Player' : (args[3]?.opponentName || (state as any)?.opponentName || 'Opponent');
+
+    const res = drawCardsWithMinionEffectsDeckInternal(
+      state[deckKey],
+      state[discardKey],
+      drawCount,
+      side,
+      // use the real player/opponent names for better logs
+      (state as any).playerClass || (args[3]?.playerClass) || PlayerClass.WARRIOR,
+      (args[3]?.opponentName) || who
+    );
+
+    // Commit results to state
+    state[deckKey] = res.updatedDeck;
+    state[discardKey] = res.updatedDiscardPile;
+    (state as any)[handKey].push(...res.drawnCards);
+
+    // Append minion damage logs, if we have a battle log
+    if (Array.isArray(res.minionDamageLog) && res.minionDamageLog.length && state?.battleLog) {
+      state.battleLog.push(...res.minionDamageLog);
+    }
+    // Return just the drawn cards like GameEngine expects
+    return res.drawnCards;
+  }
+
+  // Deck-based legacy signature passthrough
+  return drawCardsWithMinionEffectsDeckInternal.apply(null, args as any);
+}
+
+/**
+ * Simpler side-based drawCards wrapper for GameEngine.startTurn fallback.
+ */
+export function drawCards(side: 'player' | 'opponent', numCards: number, state: BattleState): Card[] {
+  return drawCardsWithMinionEffects(side, numCards, state);
 }
 
 export function drawCardsWithReshuffle(
@@ -1160,171 +1244,6 @@ export function drawCardsWithReshuffle(
   };
 }
 
-/** @deprecated Legacy stub. Use drawCardsWithMinionEffects or drawCardsWithReshuffle instead. */
-// Kept temporarily for backward compatibility; prefer the deck-aware helpers.
-export function drawCards(battleState: BattleState, numCards: number = 1): BattleState {
-  const newBattleState = { ...battleState };
-  
-  // For now, we'll use a simple implementation since we don't have deck access in battle state
-  // In a full implementation, we'd need to track deck state in battle
-  for (let i = 0; i < numCards; i++) {
-    if (newBattleState.playerHand.length < 8) { // Max hand size
-      newBattleState.playerHand.push(newBattleState.playerHand[0] || { 
-        id: 'placeholder', 
-        name: 'Card', 
-        description: 'A card', 
-        cost: 1, 
-        class: PlayerClass.WARRIOR,
-        rarity: Rarity.COMMON
-      });
-    }
-  }
-
-  return newBattleState;
-}
-
-
-export function endTurn(battleState: BattleState, player: Player, opponent: Opponent): { newBattleState: BattleState; newPlayer: Player; newOpponent: Opponent } {
-  const newBattleState = { ...battleState };
-  const log: string[] = [];
-  let newPlayer = { ...player };
-  let newOpponent = { ...opponent };
-  
-  if (newBattleState.turn === Turn.PLAYER) {
-    // End of player turn - discard all cards in hand (block persists until opponent's turn)
-    const cardsToDiscard = [...newBattleState.playerHand];
-    newBattleState.playerHand = [];
-
-    // Burn volatile cards that were discarded
-    const playerVolatileCardsBurned = cardsToDiscard.filter(card =>
-      card.types && card.types.includes(CardType.VOLATILE)
-    );
-
-    // Add non-volatile cards to discard pile
-    const playerNonVolatileCards = cardsToDiscard.filter(card =>
-      !card.types || !card.types.includes(CardType.VOLATILE)
-    );
-    newBattleState.playerDiscardPile = [...newBattleState.playerDiscardPile, ...playerNonVolatileCards];
-
-    if (playerVolatileCardsBurned.length > 0) {
-      log.push(formatLogText(`${newPlayer.class} burned ${playerVolatileCardsBurned.length} volatile card(s) at end of turn.`, newPlayer.class, newOpponent.name));
-    }
-
-    if (playerNonVolatileCards.length > 0) {
-      // No log for discarding cards at end of turn
-    }
-
-    // (status effects duration tick now handled by triggerBeforeDraw)
-
-    // Update draw modifications (reduce duration) - AFTER player turn
-    newBattleState.playerDrawModifications = updateDrawModifications(newBattleState.playerDrawModifications);
-    newBattleState.opponentDrawModifications = updateDrawModifications(newBattleState.opponentDrawModifications);
-
-    // Reset played cards for the next turn
-    newBattleState.playerPlayedCards = [];
-
-    newBattleState.turn = Turn.OPPONENT;
-
-    // Reset opponent energy at start of their turn
-    newBattleState.opponentEnergy = 2;
-
-    // Before opponent draw — unified beforeDraw phase
-    triggerBeforeDraw(
-      'opponent',
-      newBattleState,
-      newPlayer,
-      newOpponent,
-      log
-    );
-
-    // Store cards added during beforeDraw (these should be kept)
-    const startOfTurnAddedCards = [...newBattleState.opponentHand];
-
-    // Start of opponent turn - draw cards with proper reshuffle logic
-    // Clear opponent's hand first, but preserve cards added during beforeDraw phase
-    const previousHandCards = newBattleState.opponentHand.filter(card =>
-      !startOfTurnAddedCards.some(startCard => startCard.id === card.id)
-    );
-    newBattleState.opponentHand = [...startOfTurnAddedCards]; // Keep beforeDraw cards
-
-    // Discard all previous hand cards (burn volatile ones)
-    const opponentPreviousVolatileCardsBurned = previousHandCards.filter(card =>
-      card.types && card.types.includes(CardType.VOLATILE)
-    );
-    const opponentPreviousNonVolatileCards = previousHandCards.filter(card =>
-      !card.types || !card.types.includes(CardType.VOLATILE)
-    );
-    newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, ...opponentPreviousNonVolatileCards];
-
-    if (opponentPreviousVolatileCardsBurned.length > 0) {
-      log.push(formatLogText(`${newOpponent.name} burned ${opponentPreviousVolatileCardsBurned.length} volatile card(s) from previous turn.`, newPlayer.class, newOpponent.name));
-    }
-    // Start-of-turn draw for opponent (with hand limit 7)
-    performDraw('opponent', newBattleState, newPlayer, newOpponent, log, { handLimit: 7 });
-    dbg(`Opponent drew cards`);
-  } else {
-    // End of opponent turn - discard all cards in hand and reset block
-    const cardsToDiscard = [...newBattleState.opponentHand];
-    newBattleState.opponentHand = [];
-    // newBattleState.opponentBlock = 0; // Reset opponent block at end of turn (now handled in triggerBeforeDraw)
-
-    // Burn volatile cards that were discarded
-    const opponentEndTurnVolatileCardsBurned = cardsToDiscard.filter(card =>
-      card.types && card.types.includes(CardType.VOLATILE)
-    );
-
-    // Add non-volatile cards to discard pile
-    const opponentEndTurnNonVolatileCards = cardsToDiscard.filter(card =>
-      !card.types || !card.types.includes(CardType.VOLATILE)
-    );
-    newBattleState.opponentDiscardPile = [...newBattleState.opponentDiscardPile, ...opponentEndTurnNonVolatileCards];
-
-    if (opponentEndTurnVolatileCardsBurned.length > 0) {
-      log.push(formatLogText(`${newOpponent.name} burned ${opponentEndTurnVolatileCardsBurned.length} volatile card(s) at end of turn.`, newPlayer.class, newOpponent.name));
-    }
-
-    // Note: Non-volatile discarded cards are not logged for opponent
-
-    // (status effects duration tick now handled by triggerBeforeDraw)
-
-    // DON'T update draw modifications here - we want them to persist for the player's draw phase
-
-    // Reset played cards for the next turn
-    newBattleState.opponentPlayedCards = [];
-
-    newBattleState.turn = Turn.PLAYER;
-    newBattleState.playerEnergy = 3; // Reset energy
-
-    // Before player draw — unified beforeDraw phase
-    triggerBeforeDraw(
-      'player',
-      newBattleState,
-      newPlayer,
-      newOpponent,
-      log
-    );
-
-    // Start-of-turn draw for player (no hand limit)
-    performDraw('player', newBattleState, newPlayer, newOpponent, log);
-    dbg(`Player drew cards`);
-    // NOW update draw modifications AFTER the player has drawn their cards
-    newBattleState.playerDrawModifications = updateDrawModifications(newBattleState.playerDrawModifications);
-    newBattleState.opponentDrawModifications = updateDrawModifications(newBattleState.opponentDrawModifications);
-  }
-
-  // Add log entries to battle log if any
-  if (log.length > 0) {
-    newBattleState.battleLog = [...newBattleState.battleLog, ...log];
-  }
-
-  dbg('=== END TURN DEBUG ===');
-  dbg('Final battle log length:', newBattleState.battleLog.length);
-  dbg('Final battle log:', newBattleState.battleLog);
-  dbg('New log entries added:', log);
-  dbg('=== END TURN DEBUG ===');
-
-  return { newBattleState, newPlayer, newOpponent };
-}
 
 export function getRandomCards(playerClass: PlayerClass, count: number = 3): Card[] {
   const classCards = playerCards[playerClass];

@@ -15,6 +15,7 @@ export enum CardType {
 }
 
 export enum TriggerPhase {
+  BATTLEBEGIN = 'battleBegin',
   BEFOREDRAW = 'beforeDraw',
   STARTOFTURN = 'startOfTurn',
   ONCARDRAW = 'onCardDraw',
@@ -104,6 +105,8 @@ export interface Opponent {
   type: OpponentType;
   health: number;
   maxHealth: number;
+  energy: number;
+  maxEnergy: number;
   portrait: string;
   deck: Deck;
   difficulty: Difficulty;

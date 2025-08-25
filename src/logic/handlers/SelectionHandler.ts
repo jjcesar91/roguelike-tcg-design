@@ -1,42 +1,17 @@
 import { dbg } from '@/lib/debug';
-import { Card, Player, Difficulty } from '@/types/game';
-import { replaceCardInDeck, getRandomOpponent, initializeBattle, drawCardsWithReshuffle, getRandomCards } from '@/lib/gameUtils';
+import { Card, Player } from '@/types/game';
+import { replaceCardInDeck, getRandomCards } from '@/lib/gameUtils';
 
 export class SelectionHandler {
   static handleCardSelect(card: Card, player: Player, replaceCardId: string) {
+    // Replace the selected card in the player's deck and return the updated player.
     const newPlayer = replaceCardInDeck(player, replaceCardId, card);
-    
-    // Get next opponent based on the current player level (from game state, not newPlayer)
-    let difficulty: Difficulty;
-    if (player.level === 2) {
-      difficulty = Difficulty.MEDIUM;      // After beating level 1 (now level 2), fight medium opponent
-    } else if (player.level === 3) {
-      difficulty = Difficulty.BOSS;        // After beating level 2 (now level 3), fight boss opponent
-    } else {
-      difficulty = Difficulty.BOSS;        // fallback
-    }
-    
-    dbg(`Player level: ${player.level}, selecting opponent difficulty: ${difficulty}`);
-    
-    const opponent = getRandomOpponent(difficulty);
-    const battleState = initializeBattle(newPlayer, opponent);
-    
-    // Draw 3 cards for player's first turn using proper draw mechanics
-    const updatedBattleState = { ...battleState };
-    const drawResult = drawCardsWithReshuffle(
-      updatedBattleState.playerDeck, 
-      updatedBattleState.playerDiscardPile, 
-      3
-    );
-    updatedBattleState.playerHand = drawResult.drawnCards;
-    updatedBattleState.playerDeck = drawResult.updatedDeck;
-    updatedBattleState.playerDiscardPile = drawResult.updatedDiscardPile;
 
-    return {
-      newPlayer,
-      opponent,
-      battleState: updatedBattleState
-    };
+    // Post-battle flow: DO NOT start a new battle here. The UI (Game.tsx)
+    // should now call GameEngine.createBattle(nextDifficulty) → splash → battleBegin → startTurn.
+    dbg(`Reward applied: replaced ${replaceCardId} with ${card.id}. Player level now ${newPlayer.level}.`);
+
+    return { newPlayer };
   }
 
   static handlePassiveSelect(player: Player, passive: any) {

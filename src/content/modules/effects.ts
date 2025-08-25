@@ -87,6 +87,18 @@ const EFFECTS: Record<EffectCode, (ctx: EffectContext, params?: any) => void> = 
     const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'player' : 'opponent');
     const count: number = params?.count ?? 1;
 
+    // --- Condition logic ---
+    if (params?.condition) {
+      // Determine actor based on target
+      const actor = target === 'player' ? player : opponent;
+      // Only implement ownerBelowHealthPct for now
+      if (typeof params.condition.ownerBelowHealthPct === 'number') {
+        if ((actor.health / actor.maxHealth) >= params.condition.ownerBelowHealthPct) {
+          return;
+        }
+      }
+    }
+
     // Accept either an inline `card` template or an index into related_cards
     const pool = Array.isArray(sourceCard.related_cards) ? sourceCard.related_cards : [];
     const fromIndex: number | undefined = params?.index;
@@ -132,19 +144,39 @@ const EFFECTS: Record<EffectCode, (ctx: EffectContext, params?: any) => void> = 
 
   apply_mod: (ctx, params) => {
     const { state, side, log, opponent, player, sourceCard } = ctx;
-    const target: 'player' | 'opponent' = params?.target ?? (side === 'player' ? 'opponent' : 'player');
     const type: ModType = params?.type;
-    const stacks: number = params?.stacks ?? params?.value ?? 1;
+    let stacks: number = params?.stacks ?? params?.value ?? 1;
     const duration: number | undefined = params?.duration;
     const nestedEffects = params?.effects as EffectInstance[] | undefined;
     if (!type || stacks === 0) return;
 
-    if (target === 'player') {
-      state.playerMods = applyMod(state.playerMods, type, stacks, duration, nestedEffects);
-      log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} applied ${Math.abs(stacks)} ${type} to player`, player.class, opponent.name, sourceCard.name));
+    // Resolve target: support relative ('self'|'opponent') and absolute ('player'|'opponent') inputs.
+    const rawTarget: 'self' | 'opponent' | 'player' | 'opponent' | undefined = params?.target;
+    const target: 'player' | 'opponent' =
+      rawTarget === 'self' ? side :
+      rawTarget === 'opponent' ? (side === 'player' ? 'opponent' : 'player') :
+      rawTarget === 'player' || rawTarget === 'opponent' ? rawTarget : side; // default to self
+
+    const isPlayerTarget = target === 'player';
+    const tgtLabel = isPlayerTarget ? 'Player' : opponent.name;
+
+    if (stacks > 0) {
+      if (isPlayerTarget) {
+        state.playerMods = applyMod(state.playerMods, type, stacks, duration, nestedEffects);
+      } else {
+        state.opponentMods = applyMod(state.opponentMods, type, stacks, duration, nestedEffects);
+      }
+      const durText = typeof duration === 'number' ? ` for ${duration} turn(s)` : '';
+      log.push(formatLogText(`${tgtLabel} gains ${Math.abs(stacks)} ${type}${durText}`, player.class, opponent.name, sourceCard?.name));
     } else {
-      state.opponentMods = applyMod(state.opponentMods, type, stacks, duration, nestedEffects);
-      log.push(formatLogText(`${side === 'player' ? 'Player' : opponent.name} applied ${Math.abs(stacks)} ${type} to ${opponent.name}`, player.class, opponent.name, sourceCard.name));
+      // Negative stacks: consume/remove stacks
+      const remove = Math.abs(stacks);
+      if (isPlayerTarget) {
+        state.playerMods = consumeModStacks(state.playerMods || [], type, remove);
+      } else {
+        state.opponentMods = consumeModStacks(state.opponentMods || [], type, remove);
+      }
+      log.push(formatLogText(`${tgtLabel} loses ${remove} ${type}`, player.class, opponent.name, sourceCard?.name));
     }
   },
 
@@ -399,10 +431,9 @@ const EFFECTS: Record<EffectCode, (ctx: EffectContext, params?: any) => void> = 
     }
   },
 
-  ambush: (ctx, _params) => {
-    // This effect serves as a marker in passives; battle initialization can detect opponent passives
-    // containing EffectCode.ambush to let the opponent start first. No runtime action needed here.
-    (ctx.state as any).__ambushFlag = true;
+  ambush: (_ctx, _params) => {
+    // no-op: presence of EffectCode.ambush on a passive with trigger BATTLEBEGIN is
+    // inspected by GameEngine.battleBegin to set the initial turn.
   },
 };
 

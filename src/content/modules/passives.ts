@@ -133,7 +133,8 @@ export const opponentPassives: Record<string, Passive> = {
     description: 'This enemy plays first in battle.',
     effects: [
       {
-        code: EffectCode.ambush // used during battle init to set who starts
+        code: EffectCode.ambush,
+        trigger: TriggerPhase.BATTLEBEGIN
       }
     ]
   },
@@ -146,8 +147,6 @@ export const opponentPassives: Record<string, Passive> = {
         code: EffectCode.add_card_to_hand,
         trigger: TriggerPhase.BEFOREDRAW,
         params: {
-          side: 'opponent',
-          // A minimal inline definition; your EFFECTS handler can accept this shape
           card: {
             id: 'goblin_cower_volatile_template',
             name: 'Cower',
@@ -158,7 +157,7 @@ export const opponentPassives: Record<string, Passive> = {
               { code: EffectCode.apply_mod, params: { type: ModType.EVASIVE, stacks: 1, duration: 1, target: 'self' } }
             ]
           },
-          condition: { belowHealthPct: 0.5 }
+          ownerBelowHealthPct: 0.5
         }
       }
     ]

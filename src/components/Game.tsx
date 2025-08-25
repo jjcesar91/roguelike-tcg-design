@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { dbg } from '@/lib/debug';
 import { useGameState } from '@/hooks/useGameState';
 import { useSelectionState } from '@/hooks/useSelectionState';
@@ -17,7 +17,7 @@ import { SplashScreen } from './game/shared/SplashScreen';
 import { StartingSplashScreen } from './game/shared/StartingSplashScreen';
 import { OpponentCardPreview } from './game/battle/OpponentCardPreview';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { GamePhase, PlayerClass } from '@/types/game';
+import { GamePhase, PlayerClass, Difficulty, Turn } from '@/types/game';
 import { OpponentAI } from '@/logic/game/OpponentAI';
 import { playerClasses } from '@/data/gameData';
 
@@ -25,7 +25,6 @@ export default function Game() {
   const {
     gameState,
     gameStateRef,
-    startGame,
     updatePlayer,
     updateOpponent,
     updateBattleState,
@@ -64,139 +63,149 @@ export default function Game() {
     setShowDiscardModal
   } = useModalState();
 
+  // Small helpers & timing constants
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const PREVIEW_DELAY = 800;
+  const BETWEEN_CARDS_DELAY = 400;
+
+  const startBattleWithSplash = (difficulty?: Difficulty) => {
+    // Create the battle via centralized engine and use the returned values
+    const { player, opponent, battleState} = GameEngine.createBattle(gameStateRef.current.player!, difficulty);
+
+    if (!opponent || !battleState) {
+      dbg('❌ After createBattle, opponent/battleState missing');
+      return;
+    }
+
+    updatePlayer(player);
+    updateOpponent(opponent);
+    updateBattleState(battleState);
+
+    showBattleSplash(opponent, async () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      try {
+        const st = gameStateRef.current;
+        const p = st?.player;
+        const o = st?.currentOpponent;
+        const bs = st?.battleState;
+        if (!p || !o || !bs) return;
+
+        // Re-read state after engine hooks
+        const turn = st.battleState?.turn;
+
+        // Start-of-turn pipeline for the side who begins
+        if (turn === Turn.OPPONENT || turn === Turn.PLAYER) {
+          const side = turn === Turn.OPPONENT ? 'opponent' : 'player';
+          try {
+            const started = GameEngine.startTurn?.(side, st.player!, st.currentOpponent!, st.battleState!);
+            if (started?.battleState) {
+              updateBattleState(started.battleState);
+              updatePlayer(started.player ?? st.player!);
+              updateOpponent(started.opponent ?? st.currentOpponent!);
+            }
+          } catch (err) {
+            dbg(`startTurn(${side}) at battle begin failed:`, err as any);
+          }
+        }
+
+        // If opponent starts, immediately trigger AI loop
+        if (turn === Turn.OPPONENT) {
+          dbg('Opponent starts — triggering AI turn');
+          playOpponentTurn();
+        }
+      } catch (e) {
+        dbg('battleBegin error:', e as any);
+      }
+    });
+  };
+
   const handleClassSelect = (playerClass: PlayerClass) => {
     try {
       dbg('🚀 handleClassSelect called with:', playerClass);
-      
-      const newGameState = startGame(playerClass);
-      dbg('📋 useGameState.startGame result:', { 
-        gamePhase: newGameState.gamePhase, 
-        player: newGameState.player, 
-        opponent: newGameState.currentOpponent,
-        battleState: { ...newGameState.battleState, turn: newGameState.battleState?.turn }
-      });
-      
+
+      // 1) Initialize the run (player only)
+      const init = GameEngine.initRun(playerClass);
+      updatePlayer(init.player);
       setSelectedClass(playerClass);
-      
-      // Show splash screen with scroll callback
-      if (!newGameState.currentOpponent) {
-        dbg('❌ No opponent returned from startGame; aborting splash');
-        return;
-      }
-      showBattleSplash(newGameState.currentOpponent, () => {
-        dbg('🎬 Splash screen callback triggered');
-        // Scroll to top after splash screen completes
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        // Check if opponent has ambush and goes first
-        setTimeout(() => {
-          dbg('⏰ Ambush check timeout triggered');
-          // Use the current game state from ref instead of captured battleState
-          const currentState = gameStateRef.current;
-          dbg('📋 Current state in timeout:', { 
-            gamePhase: currentState.gamePhase, 
-            player: currentState.player, 
-            opponent: currentState.currentOpponent,
-            battleState: { ...currentState.battleState, turn: currentState.battleState?.turn }
-          });
-          
-          if (currentState.battleState && currentState.battleState.turn === 'opponent') {
-            dbg('Opponent has ambush - triggering first turn');
-            playOpponentTurn();
-          } else {
-            dbg('No ambush detected or missing battle state');
-          }
-        }, 500); // Small delay after splash screen
-      });
-      
-      // Force a re-render by logging immediately after
-      setTimeout(() => {
-        dbg('📋 Game state after 100ms delay:', gameState);
-        dbg('Current game phase after update:', gameState.gamePhase);
-        dbg('Current opponent after update:', gameState.currentOpponent);
-      }, 100);
-      
+
+      // 2) Start the first battle at BASIC difficulty via centralized flow
+      startBattleWithSplash(Difficulty.BASIC);
     } catch (error) {
       console.error('❌ Error in handleClassSelect:', error);
     }
   };
 
   // Simplified, sequential opponent turn without nested setTimeout chains
-  const playOpponentTurn = async () => {
+  const playOpponentTurn = useCallback(async () => {
     const current = gameStateRef.current;
     if (!current.battleState || !current.player || !current.currentOpponent) return;
 
-    // Draw 3 for opponent at start of their first turn (ambush or regular)
-    const { drawCardsWithMinionEffects, formatLogText, opponentPlayCard } = await import('@/lib/gameUtils');
-    // Make local copies of battle state, player and opponent to mutate through the turn
+    // Local working copies
     let bs = { ...current.battleState };
     let pl = { ...current.player };
     let op = { ...current.currentOpponent };
-
-    const draw = drawCardsWithMinionEffects(
-      bs.opponentDeck,
-      bs.opponentDiscardPile,
-      3,
-      'opponent',
-      pl.class,
-      op.name
-    );
-    bs.opponentHand = [...bs.opponentHand, ...draw.drawnCards];
-    bs.opponentDeck = draw.updatedDeck;
-    bs.opponentDiscardPile = draw.updatedDiscardPile;
-    bs.battleLog = [...bs.battleLog, formatLogText('Opponent draws 3 cards...', pl.class, op.name), ...draw.minionDamageLog];
-    // Update state after drawing cards
-    updateBattleState(bs);
-    updateOpponent(op);
 
     // Instantiate unified opponent AI
     const ai = new OpponentAI();
 
     // Loop until no playable cards
     while (true) {
-      // Determine next set of cards to play based on current state
       const plays = ai.decidePlays(bs.opponentHand, bs.opponentEnergy, bs, op, pl);
-      if (!plays || plays.length === 0) {
-        break;
-      }
+      if (!plays || plays.length === 0) break;
+
       // Always play cards one by one, recomputing after each play
       const card = plays[0];
+
       // Show preview for the chosen card
       updateOpponentCardPreview(card, true);
-      await new Promise(r => setTimeout(r, 800));
+      await sleep(PREVIEW_DELAY);
       updateOpponentCardPreview(null, false);
-      // Play the specific card
-      const res = opponentPlayCard(op, pl, bs, card);
-      // Merge logs: append our AI log entries
-      const mergedLog = [...res.newBattleState.battleLog, ...res.log];
-      bs = { ...res.newBattleState, battleLog: mergedLog };
-      pl = res.newPlayer;
-      op = res.newOpponent;
-      // Update React state
+
+      // Execute the card through the shared engine path
+      const res = GameEngine.playCard(card, pl, op, bs);
+
+      // Normalize and persist returned state
+      bs = res.newBattleState ?? bs;
+      pl = res.newPlayer ?? pl;
+      op = res.newOpponent ?? op;
+
       updateBattleState(bs);
       updatePlayer(pl);
       updateOpponent(op);
 
-      // Check for victory or defeat
-      if (GameEngine.checkVictory(pl, op)) {
-        handleVictory();
-        return;
-      }
-      if (GameEngine.checkDefeat(pl)) {
-        handleDefeat();
-        return;
-      }
-      // small pause between cards
-      await new Promise(r => setTimeout(r, 400));
-    }
-    // End opponent turn when no cards are left to play
-    const end = GameEngine.endTurn(bs, pl, op);
-    updateBattleState(end.newBattleState);
-    updatePlayer(end.newPlayer);
-    updateOpponent(end.newOpponent);
-  };
+      // Victory/defeat checks
+      if (GameEngine.checkVictory(pl, op)) { handleVictory(); return; }
+      if (GameEngine.checkDefeat(pl)) { handleDefeat(); return; }
 
-  
+      await sleep(BETWEEN_CARDS_DELAY);
+    }
+
+    // End opponent turn when no cards are left to play
+    const end = await GameEngine.endTurn(bs, pl, op);
+    bs = end.newBattleState;
+    pl = end.newPlayer;
+    op = end.newOpponent;
+    updateBattleState(bs);
+    updatePlayer(pl);
+    updateOpponent(op);
+
+    // Immediately start the player's next turn (no extra draws elsewhere).
+    try {
+      const startedNext = await (GameEngine as any).startTurn?.('player', pl, op, bs);
+      if (startedNext && startedNext.battleState) {
+        bs = startedNext.battleState;
+        pl = startedNext.player ?? pl;
+        op = startedNext.opponent ?? op;
+        updateBattleState(bs);
+        updatePlayer(pl);
+        updateOpponent(op);
+      }
+    } catch (err) {
+      dbg('startTurn(player) after opponent endTurn failed:', err as any);
+    }
+  }, [gameStateRef, updateBattleState, updateOpponent, updateOpponentCardPreview, updatePlayer, handleVictory, handleDefeat]);
+
   const handleCardPlay = (card: any) => {
     dbg('=== GAME COMPONENT CARD PLAY DEBUG ===');
     dbg('Card being played:', card);
@@ -204,7 +213,7 @@ export default function Game() {
     dbg('Card ID:', card.id);
     dbg('Card cost:', card.cost);
     dbg('Current game state:', gameState);
-    
+
     if (!gameState.player || !gameState.currentOpponent || !gameState.battleState) {
       dbg('❌ Missing required game state for card play');
       return;
@@ -213,7 +222,7 @@ export default function Game() {
     dbg('✅ Game state valid, calling GameEngine.playCard...');
     const result = GameEngine.playCard(card, gameState.player, gameState.currentOpponent, gameState.battleState);
     dbg('GameEngine.playCard result:', result);
-    
+
     updatePlayer(result.newPlayer);
     updateOpponent(result.newOpponent);
     updateBattleState(result.newBattleState);
@@ -229,56 +238,59 @@ export default function Game() {
     dbg('=== GAME COMPONENT CARD PLAY COMPLETE ===');
   };
 
-  const handleEndTurn = () => {
+  const handleEndTurn = async () => {
     dbg('handleEndTurn called');
     if (!gameState.battleState || !gameState.player || !gameState.currentOpponent) return;
 
-    const { newBattleState, newPlayer, newOpponent, isOpponentTurn } = GameEngine.endTurn(
-      gameState.battleState, 
-      gameState.player, 
+    const { newBattleState, newPlayer, newOpponent, isOpponentTurn } = await GameEngine.endTurn(
+      gameState.battleState,
+      gameState.player,
       gameState.currentOpponent
     );
-    
+
     dbg('After endTurn, new turn:', newBattleState.turn);
-    
+
     updateBattleState(newBattleState);
     updatePlayer(newPlayer);
     updateOpponent(newOpponent);
-    
+
     if (isOpponentTurn) {
-      dbg('Setting up opponent turn...');
-      // Use the unified opponent turn runner
+      // Prepare the opponent's start-of-turn (draws + triggers), then run the AI loop.
+      try {
+        const started = await (GameEngine as any).startTurn?.('opponent', newPlayer, newOpponent, newBattleState);
+        if (started && started.battleState) {
+          updateBattleState(started.battleState);
+          updatePlayer(started.player ?? newPlayer);
+          updateOpponent(started.opponent ?? newOpponent);
+        }
+      } catch (err) {
+        dbg('startTurn(opponent) after player endTurn failed:', err as any);
+      }
       setTimeout(() => {
         playOpponentTurn();
       }, 300);
     }
   };
 
-
   const handleCardSelect = (card: any) => {
     if (!gameState.player || !selectedReplaceCard) return;
 
-    const { newPlayer, opponent, battleState } = GameEngine.selectCard(
-      card, 
-      gameState.player, 
+    const { newPlayer } = GameEngine.selectCard(
+      card,
+      gameState.player,
       selectedReplaceCard
     );
-    
+
     updatePlayer(newPlayer);
-    updateOpponent(opponent);
-    updateBattleState(battleState);
-    setGamePhase(GamePhase.BATTLE);
+
     setAvailableCards([]);
     setAvailablePassives([]);
 
     setSelectedCard(null);
     setSelectedReplaceCard(null);
-    
-    // Show splash screen with scroll callback
-    showBattleSplash(opponent, () => {
-      // Scroll to top after splash screen completes
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
+
+    // Start the next battle using centralized flow (difficulty inferred from state)
+    startBattleWithSplash();
   };
 
   const handlePassiveSelect = (passive: any) => {
@@ -292,6 +304,9 @@ export default function Game() {
     setAvailablePassives([]);
 
     setSelectedPassive(null);
+
+    // Start the next battle using centralized flow (difficulty inferred from state)
+    startBattleWithSplash();
   };
 
   const handleRestart = () => {
@@ -312,34 +327,34 @@ export default function Game() {
     <TooltipProvider>
       <div className="container mx-auto p-4 max-w-[720px]">
         {/* Starting Splash Screen */}
-        <StartingSplashScreen 
-          isVisible={gameState.gamePhase === 'starting-splash'}
+        <StartingSplashScreen
+          isVisible={gameState.gamePhase === GamePhase.STARTING_SPLASH}
           onComplete={handleStartingSplashComplete}
         />
-        
+
         {/* Splash Screen */}
-        <SplashScreen 
+        <SplashScreen
           showSplashScreen={showSplashScreen}
           splashOpponent={splashOpponent}
         />
-        
+
         {/* Opponent Card Preview */}
-        <OpponentCardPreview 
+        <OpponentCardPreview
           card={gameState.opponentCardPreview.card}
           isVisible={gameState.opponentCardPreview.isVisible}
           onHide={() => updateOpponentCardPreview(null, false)}
         />
-        
+
         {/* Game Phases */}
-        {gameState.gamePhase === 'class-selection' && (
-          <ClassSelection 
+        {gameState.gamePhase === GamePhase.CLASS_SELECTION && (
+          <ClassSelection
             onClassSelect={handleClassSelect}
             availableClasses={Object.keys(playerClasses) as PlayerClass[]}
           />
         )}
-        
-        {gameState.gamePhase === 'battle' && gameState.player && gameState.currentOpponent && gameState.battleState && (
-          <BattlePhase 
+
+        {gameState.gamePhase === GamePhase.BATTLE && gameState.player && gameState.currentOpponent && gameState.battleState && (
+          <BattlePhase
             player={gameState.player}
             opponent={gameState.currentOpponent}
             battleState={gameState.battleState}
@@ -353,9 +368,9 @@ export default function Game() {
             splashCompleted={splashCompleted}
           />
         )}
-        
-        {gameState.gamePhase === 'card-selection' && gameState.player && (
-          <CardSelection 
+
+        {gameState.gamePhase === GamePhase.CARD_SELECTION && gameState.player && (
+          <CardSelection
             player={gameState.player}
             availableCards={gameState.availableCards}
             selectedCard={selectedCard}
@@ -368,9 +383,9 @@ export default function Game() {
             }}
           />
         )}
-        
-        {gameState.gamePhase === 'passive-selection' && gameState.player && (
-          <PassiveSelection 
+
+        {gameState.gamePhase === GamePhase.PASSIVE_SELECTION && gameState.player && (
+          <PassiveSelection
             player={gameState.player}
             availablePassives={gameState.availablePassives}
             selectedPassive={selectedPassive}
@@ -381,12 +396,12 @@ export default function Game() {
             }}
           />
         )}
-        
-        {gameState.gamePhase === 'victory' && (
+
+        {gameState.gamePhase === GamePhase.VICTORY && (
           <VictoryScreen onRestart={handleRestart} />
         )}
-        
-        {gameState.gamePhase === 'defeat' && (
+
+        {gameState.gamePhase === GamePhase.DEFEAT && (
           <DefeatScreen onRestart={handleRestart} />
         )}
       </div>

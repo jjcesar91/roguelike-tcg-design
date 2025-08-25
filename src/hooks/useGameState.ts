@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { GameState, PlayerClass, Player, Opponent, BattleState, GamePhase } from '@/types/game';
-import { createPlayer, getRandomOpponent, initializeBattle, getRandomCards, getRandomPassives, replaceCardInDeck, drawCardsWithReshuffle } from '@/lib/gameUtils';
 import { GameEngine } from '@/logic/game/GameEngine';
 
 export const useGameState = () => {
@@ -26,19 +25,17 @@ export const useGameState = () => {
     console.log('Current game phase:', gameState.gamePhase);
   }, [gameState]);
 
-  const startGame = (playerClass: PlayerClass) => {
-    const { player, opponent, battleState } = GameEngine.startGame(playerClass);
-
+  const initRun = (playerClass: PlayerClass) => {
+    const { player } = GameEngine.initRun(playerClass);
     const nextState: GameState = {
       ...gameStateRef.current,
       player,
-      currentOpponent: opponent,
-      battleState,
+      currentOpponent: null,
+      battleState: null,
       gamePhase: GamePhase.BATTLE,
       availableCards: [],
       availablePassives: []
     };
-
     setGameState(nextState);
     gameStateRef.current = nextState;
     return nextState;
@@ -122,7 +119,7 @@ export const useGameState = () => {
     // After beating medium opponent (when current level is 2), offer passive selection
     if (currentLevel === 2) {
       nextPhase = GamePhase.PASSIVE_SELECTION;
-      availablePassives = getRandomPassives(gameState.player.class, 3);
+      availablePassives = GameEngine.getAvailablePassives(gameState.player.class, 3);
     }
 
     // After beating boss (level 3), game is complete
@@ -134,7 +131,7 @@ export const useGameState = () => {
       return;
     }
 
-    const availableCards = getRandomCards(gameState.player.class, 3);
+    const availableCards = GameEngine.getAvailableCards(gameState.player.class, 3);
 
     setGameState(prev => ({
       ...prev,
@@ -155,7 +152,7 @@ export const useGameState = () => {
   return {
     gameState,
     gameStateRef,
-    startGame,
+    initRun,
     updatePlayer,
     updateOpponent,
     updateBattleState,
