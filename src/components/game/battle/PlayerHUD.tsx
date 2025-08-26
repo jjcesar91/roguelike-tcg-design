@@ -152,7 +152,7 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
 
           {/* Mini Cards Display - Centered and Overlapping */}
           <div className="absolute bottom-[50px] left-1/2 transform -translate-x-1/2 flex items-end z-20 pointer-events-auto mb-[-35px]">
-            {battleState.playerHand.slice(0, 4).map((card, index) => {
+            {battleState.playerHand.map((card, index) => {
               return (
                 <div 
                   key={`${card.id}-${index}`} 

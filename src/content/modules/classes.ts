@@ -10,7 +10,7 @@ export const playerClasses: Record<PlayerClass, {
   portrait: string;
   icon: React.ComponentType<any>;
   description: string;
-  startingCards: string[];
+  startingDeck: string[];
   health: number;
   energy: number;
   available: boolean;
@@ -21,8 +21,9 @@ export const playerClasses: Record<PlayerClass, {
     portrait: "https://i.imgur.com/ccO2ryT.png",
     icon: Swords,
     description: 'Master of combat and defense',
-    startingCards: ['Strike', 'Defend', 'Bash'],
-    health: 75,
+    startingDeck: ['warrior_strike','warrior_strike','warrior_strike','warrior_strike','warrior_strike', 
+      'warrior_defend','warrior_defend','warrior_defend','warrior_defend', 'warrior_bash'],
+    health: 50,
     energy: 3,
     available: true
   },
@@ -32,7 +33,8 @@ export const playerClasses: Record<PlayerClass, {
     portrait: "https://i.imgur.com/ft260IB.png",
     icon: VenetianMask,
     description: 'Swift and deadly assassin',
-    startingCards: ['Strike', 'Defend', 'Backstab'],
+    startingDeck: ['warrior_strike','warrior_strike','warrior_strike','warrior_strike','warrior_strike', 
+      'warrior_defend','warrior_defend','warrior_defend','warrior_defend', 'warrior_bash'],
     health: 70,
     energy: 3,
     available: false
@@ -43,7 +45,8 @@ export const playerClasses: Record<PlayerClass, {
     portrait: "https://i.imgur.com/OGJGXCc.png",
     icon: Zap,
     description: 'Wielder of arcane powers',
-    startingCards: ['Strike', 'Defend', 'Zap'],
+    startingDeck: ['warrior_strike','warrior_strike','warrior_strike','warrior_strike','warrior_strike', 
+      'warrior_defend','warrior_defend','warrior_defend','warrior_defend', 'warrior_bash'],
     health: 65,
     energy: 3,
     available: false

@@ -33,7 +33,7 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 2,
       attack: 8,
       effects: [
-        { code: EffectCode.apply_mod, params: { target: 'opponent', type: ModType.VULNERABLE, stacks: 2 } }
+        { code: EffectCode.apply_mod, params: { target: 'opponent', type: ModType.VULNERABLE, stacks: 4 } }
       ],
       class: PlayerClass.WARRIOR,
       rarity: Rarity.COMMON,
@@ -272,26 +272,6 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       types: [CardType.SKILL]
     },
     {
-      id: 'beast_feral_rage',
-      name: 'Feral Rage',
-      description: 'Deal 12 damage. Lose 3 health',
-      cost: 1,
-      attack: 12,
-      class: OpponentType.BEAST,
-      rarity: Rarity.RARE,
-      types: [CardType.MELEE, CardType.ATTACK]
-    },
-    {
-      id: 'beast_alpha_presence',
-      name: 'Alpha Presence',
-      description: 'Gain 8 block. All beast cards cost 1 less this turn',
-      cost: 2,
-      defense: 8,
-      class: OpponentType.BEAST,
-      rarity: Rarity.RARE,
-      types: [CardType.SKILL]
-    },
-    {
       id: 'beast_hunters_instinct',
       name: 'Killing Instinct',
       description: 'Deal 10 damage. If the target is bleeding, deals 15 instead.',
@@ -303,30 +283,9 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       class: OpponentType.BEAST,
       rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
-    },
-    {
-      id: 'beast_maul',
-      name: 'Brutal Maul',
-      description: 'Deal 15 damage',
-      cost: 3,
-      attack: 15,
-      class: OpponentType.BEAST,
-      rarity: Rarity.RARE,
-      types: [CardType.MELEE, CardType.ATTACK]
-    },
-    {
-      id: 'beast_wolf_minion',
-      name: 'Wolf',
-      description: 'Unplayable minion. Deal 5 damage to player when drawn.',
-      cost: 0,
-      attack: 5,
-      class: OpponentType.BEAST,
-      rarity: Rarity.SPECIAL,
-      types: [CardType.MINION],
-      unplayable: true
     }
   ],
-  monster: [
+  goblin: [
     {
       id: 'goblin_dirty_trick',
       name: 'Dirty Trick',
@@ -335,7 +294,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       effects: [
         { code: EffectCode.draw_mod, params: { amount: -1, target: 'player', duration: 1 } }
       ],
-      class: OpponentType.MONSTER,
+      class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
@@ -345,7 +304,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 6 damage',
       cost: 1,
       attack: 6,
-      class: OpponentType.MONSTER,
+      class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
       types: [CardType.RANGED, CardType.ATTACK]
     },
@@ -355,7 +314,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'Deal 6 damage',
       cost: 1,
       attack: 6,
-      class: OpponentType.MONSTER,
+      class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
       types: [CardType.MELEE, CardType.ATTACK]
     },
@@ -367,7 +326,7 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       effects: [
         { code: EffectCode.apply_mod, params: { target: 'self', type: ModType.EVASIVE, stacks: 1 } }
       ],
-      class: OpponentType.MONSTER,
+      class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
       types: [CardType.SKILL]
     },
@@ -377,21 +336,9 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       description: 'If last turn prevented damage from an attack, deal 10 damage',
       cost: 2,
       attack: 10,
-      class: OpponentType.MONSTER,
+      class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
       types: [CardType.SKILL]
-    },
-    {
-      id: 'goblin_cower_volatile',
-      name: 'Cower',
-      description: 'Gain 1 Evasive. Volatile.',
-      cost: 2,
-      effects: [
-        { code: EffectCode.apply_mod, params: { target: 'self', type: ModType.EVASIVE, stacks: 1 } }
-      ],
-      class: OpponentType.MONSTER,
-      rarity: Rarity.COMMON,
-      types: [CardType.SKILL, CardType.VOLATILE]
     }
   ],
   undead: [
@@ -523,7 +470,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       rarity: Rarity.RARE,
       types: [CardType.ATTACK]
     }
-  ]
+  ],
+  [OpponentType.MONSTER]: []
 };
 
 // Legacy export kept for backward compatibility.  It contains no entries by

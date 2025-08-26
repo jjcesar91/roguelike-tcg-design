@@ -143,7 +143,7 @@ export class GameEngine {
 
     // 2) Draw cards (respect draw-mod helpers)
     const drawCount: number = (typeof computeDrawCountForSide === 'function'
-      ? computeDrawCountForSide(side, battleState)
+      ? computeDrawCountForSide(side, battleState, opponent)
       : 3) | 0;
 
     let drawn: Card[] = [];

@@ -94,30 +94,31 @@ export class OpponentAI {
     player: Player
   ): Card[] {
     dbg('=== OPPONENT AI DECIDE PLAYS DEBUG ===');
-
+  
     // Filter out unplayable cards by cost and unplayable flag
     let playable = hand.filter(c => !c.unplayable && c.cost <= energy);
-    if (playable.length === 0) return [];
-
+    if (!playable.length) return [];
+  
     dbg('playable cards:', playable);
-
+  
     // Exclude cards whose enabling condition is not met
     playable = playable.filter(card => {
       const cond = this.enablingConditions[card.id];
       return !cond || cond(state, opponent, player);
     });
-    if (playable.length === 0) return [];
-
+    if (!playable.length) return [];
+  
     dbg('after enabling conditions:', playable);
-
+  
     // Step 0: play any VOLATILE cards first if they are playable within current energy
     const volatilePlayable = playable.filter(c => this.isVolatile(c));
     if (volatilePlayable.length > 0) {
-      // Greedily pick volatile cards that fit within energy, preferring lower cost and higher priority
       const sortedVolatile = [...volatilePlayable].sort((a, b) => {
-        if (a.cost !== b.cost) return a.cost - b.cost; // cheaper first
-        return this.cardPriority(b) - this.cardPriority(a); // then higher priority
+        if (a.cost !== b.cost) return a.cost - b.cost;       // cheaper first
+        return this.cardPriority(b) - this.cardPriority(a);  // then higher priority
       });
+  
+      // Pick as many as fit (kept as-is)
       const chosenVolatile: Card[] = [];
       let remainingVolatile = energy;
       for (const card of sortedVolatile) {
@@ -127,7 +128,6 @@ export class OpponentAI {
         }
       }
       if (chosenVolatile.length > 0) {
-        // Order the selected volatile plays by priority desc, then cost asc
         return chosenVolatile.sort((a, b) => {
           const pa = this.cardPriority(a);
           const pb = this.cardPriority(b);
@@ -135,46 +135,27 @@ export class OpponentAI {
         });
       }
     }
-
-    // Step 1: pick cards satisfying empowering conditions
+  
+    // Step 1: pick cards satisfying empowering conditions (unchanged)
     const empowered = playable.filter(card => {
       const cond = this.empoweringConditions[card.id];
       return cond && cond(state, opponent, player);
     });
     if (empowered.length > 0) {
-      // Return empowered cards sorted by priority
       return empowered.sort((a, b) => {
         const pa = this.cardPriority(a);
         const pb = this.cardPriority(b);
-        // Higher priority first; tie break by lower cost
-        return pb - pa || a.cost - b.cost;
+        return pb - pa || a.cost - b.cost; // higher priority, then cheaper
       });
     }
-
-    // Step 2: greedily choose as many cards as possible based on cost and priority
-    // Sort cards by cost ascending then by priority descending
-    const sorted = [...playable].sort((a, b) => {
-      if (a.cost !== b.cost) return a.cost - b.cost;
-      // When costs are equal, prefer higher priority
-      return this.cardPriority(b) - this.cardPriority(a);
-    });
-    const chosen: Card[] = [];
-    let remaining = energy;
-    for (const card of sorted) {
-      if (card.cost <= remaining) {
-        chosen.push(card);
-        remaining -= card.cost;
-      }
-    }
-    if (chosen.length === 0) return [];
-
-    // Step 3: sort chosen cards by priority (descending) then by cost (ascending)
-    return chosen.sort((a, b) => {
-      const pa = this.cardPriority(a);
-      const pb = this.cardPriority(b);
-      return pb - pa || a.cost - b.cost;
+  
+    // Fallback: prefer higher-cost cards first (then higher priority)
+    return [...playable].sort((a, b) => {
+      if (a.cost !== b.cost) return b.cost - a.cost;         // higher cost first
+      return this.cardPriority(b) - this.cardPriority(a);    // then higher priority
     });
   }
+  
 
   /**
    * Determine the intrinsic priority of a card based on its type and effect.

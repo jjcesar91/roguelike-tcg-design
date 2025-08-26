@@ -147,6 +147,8 @@ export const opponentPassives: Record<string, Passive> = {
         code: EffectCode.add_card_to_hand,
         trigger: TriggerPhase.BEFOREDRAW,
         params: {
+          // optional: target: 'player' | 'opponent' (defaults to current side)
+          condition: { ownerBelowHealthPct: 0.5 },
           card: {
             id: 'goblin_cower_volatile_template',
             name: 'Cower',
@@ -154,10 +156,9 @@ export const opponentPassives: Record<string, Passive> = {
             cost: 0,
             types: [CardType.SKILL, CardType.VOLATILE],
             effects: [
-              { code: EffectCode.apply_mod, params: { type: ModType.EVASIVE, stacks: 1, duration: 1, target: 'self' } }
+              { code: EffectCode.apply_mod, params: { type: ModType.EVASIVE, stacks: 1, duration: 2, target: 'self' } }
             ]
-          },
-          ownerBelowHealthPct: 0.5
+          }
         }
       }
     ]

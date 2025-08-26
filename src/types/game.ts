@@ -41,6 +41,7 @@ export enum PlayerClass {
 export enum OpponentType {
   BEAST = 'beast',
   MONSTER = 'monster',
+  GOBLIN = 'goblin',
   UNDEAD = 'undead',
   WARRIOR = 'warrior',
   ROGUE = 'rogue',
@@ -122,6 +123,7 @@ export interface Opponent {
   maxEnergy: number;
   portrait: string;
   deck: Deck;
+  cardsDrawn: number;
   difficulty: Difficulty;
   passives?: Passive[];
 }
@@ -189,7 +191,7 @@ export interface PlayerClassData {
   portrait: string;
   icon: React.ComponentType<any>;
   description: string;
-  startingCards: string[];
+  startingDeck: string[];
   health: number;
   energy: number;
   available: boolean;

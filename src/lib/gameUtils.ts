@@ -1,14 +1,3 @@
-// ---- UTILS FOR SIDE-BASED DRAW AND PHASE HANDLING ----
-
-/**
- * Compute the number of cards to draw for a given side, applying draw modifications.
- */
-export function computeDrawCountForSide(side: 'player' | 'opponent', state: BattleState, base: number = 3): number {
-  const mods = side === 'player' ? (state.playerDrawModifications || []) : (state.opponentDrawModifications || []);
-  return calculateModifiedDrawCount(base, mods);
-}
-export const getDrawCountForSide = computeDrawCountForSide;
-
 import { dbg } from '@/lib/debug';
 import { BattleState, Card, CardType, Deck, DrawModification, Rarity, GameState, Turn, Opponent, Player, PlayerClass, OpponentType, DrawModType, Difficulty, TriggerPhase, Passive } from '@/types/game';
 import { ActiveMod, MOD_DEFS, ModType } from "@/content/modules/mods";
@@ -32,100 +21,38 @@ const playerCards = gameData.playerCards;
 const opponents = gameData.opponents;
 const passives = gameData.passives;
 
-function performDraw(
+const BASE_DRAW = 5;
+
+/**
+ * Compute the number of cards to draw for a given side, applying draw modifications.
+ */
+export function computeDrawCountForSide(
   side: 'player' | 'opponent',
   state: BattleState,
-  player: Player,
-  opponent: Opponent,
-  logSink: string[],
-  opts?: { handLimit?: number }
-) {
-  const baseDrawCount = 3;
-  const isPlayer = side === 'player';
-  const mods = isPlayer ? state.playerDrawModifications : state.opponentDrawModifications;
+  opponent?: Opponent
+): number {
+  const base = BASE_DRAW;
 
-  const cardsToDraw = calculateModifiedDrawCount(baseDrawCount, mods);
-  const drawModificationLog = formatDrawModificationLog(mods, baseDrawCount);
+  dbg(`Computing draw count for side: ${side}, base: ${base}`);
+  dbg('Opponent cardsDrawn:', opponent?.cardsDrawn);
+  // Choose base draw
+  const effectiveBase =
+    side === 'opponent'
+      ? (typeof opponent?.cardsDrawn === 'number' && Number.isFinite(opponent.cardsDrawn)
+          ? opponent.cardsDrawn
+          : (state as any)?.opponentCardsDrawn ?? base) 
+      : base;
 
-  const deck = isPlayer ? state.playerDeck : state.opponentDeck;
-  const discard = isPlayer ? state.playerDiscardPile : state.opponentDiscardPile;
+  dbg(`Effective base draw for ${side}: ${effectiveBase}`);
 
-  const drawResult = drawHand(
-    deck,
-    discard,
-    cardsToDraw,
-    side,
-    player.class,
-    opponent.name
-  );
+  const mods =
+    side === 'player'
+      ? (state.playerDrawModifications || [])
+      : (state.opponentDrawModifications || []);
 
-  if (isPlayer) {
-    state.playerHand = [...state.playerHand, ...drawResult.drawnCards];
-    state.playerDeck = drawResult.updatedDeck;
-    state.playerDiscardPile = drawResult.updatedDiscardPile;
-  } else {
-    state.opponentHand = [...state.opponentHand, ...drawResult.drawnCards];
-    state.opponentDeck = drawResult.updatedDeck;
-    state.opponentDiscardPile = drawResult.updatedDiscardPile;
-  }
-
-  // Trigger ONCARDRAW effects for each drawn card
-  for (let i = 0; i < drawResult.drawnCards.length; i++) {
-    runModEffectsForPhase(side, state, player, opponent, TriggerPhase.ONCARDRAW, logSink);
-    runTriggeredEffectsForPhase(TriggerPhase.ONCARDRAW, side, state, player, opponent, logSink);
-  }
-
-  if (drawModificationLog) {
-    logSink.push(formatLogText(drawModificationLog, player.class, opponent.name));
-  }
-
-  // Apply Wolf minion damage if any
-  if (drawResult.minionDamageLog.length > 0) {
-    const wolfDamage = drawResult.minionDamageLog.length * 5;
-    if (isPlayer) {
-      player.health = Math.max(0, player.health - wolfDamage);
-    } else {
-      opponent.health = Math.max(0, opponent.health - wolfDamage);
-    }
-  }
-  logSink.push(...drawResult.minionDamageLog);
-
-  // Enforce hand size limit if provided
-  const handLimit = opts?.handLimit;
-  if (typeof handLimit === 'number') {
-    const hand = isPlayer ? state.playerHand : state.opponentHand;
-    if (hand.length > handLimit) {
-      const excess = hand.length - handLimit;
-      const overflow = hand.splice(handLimit, excess);
-
-      // Add non-volatile cards to discard pile
-      const nonVolatile = overflow.filter(card =>
-        !card.types || !card.types.includes(CardType.VOLATILE)
-      );
-      if (isPlayer) {
-        state.playerDiscardPile = [...state.playerDiscardPile, ...nonVolatile];
-      } else {
-        state.opponentDiscardPile = [...state.opponentDiscardPile, ...nonVolatile];
-      }
-
-      // Burn volatile cards from overflow
-      const volatile = overflow.filter(card =>
-        card.types && card.types.includes(CardType.VOLATILE)
-      );
-      if (volatile.length > 0) {
-        logSink.push(formatLogText(
-          `${isPlayer ? player.class : opponent.name} burned ${volatile.length} volatile card(s) from hand overflow.`,
-          player.class,
-          opponent.name
-        ));
-      }
-    }
-  }
+  return calculateModifiedDrawCount(effectiveBase, mods);
 }
-
-
-
-
+export const getDrawCountForSide = computeDrawCountForSide;
 
 type ModSide = 'player' | 'opponent';
 
@@ -221,24 +148,41 @@ export function shuffleDeck(deck: Card[]): Card[] {
 
 export function createPlayer(playerClass: PlayerClass): Player {
   dbg('Creating player for class:', playerClass);
-  dbg('Available playerCards:', Object.keys(playerCards));
-  dbg('playerCards[playerClass]:', playerCards[playerClass]);
-  
-  const classCards = playerCards[playerClass].slice(0, 3); // First 3 cards
-  dbg('Class cards selected:', classCards);
-  
-  const deck = createDeck(classCards, 3);
-  dbg('Deck created:', deck);
+
+  const cls = gameData.playerClasses[playerClass];
+  if (!cls) {
+    dbg('Unknown playerClass, falling back to defaults:', playerClass);
+  }
+
+  // Build a lookup of card templates for this class
+  const classPool = playerCards[playerClass] || [];
+  const byId = new Map(classPool.map(c => [c.id, c]));
+
+  // Map startingDeck IDs -> card templates (keeping repeats for multiple copies)
+  const startIds = cls?.startingDeck || [];
+  const startCards: Card[] = [];
+  for (const id of startIds) {
+    const tpl = byId.get(id);
+    if (!tpl) {
+      dbg(`⚠️ startingDeck id "${id}" not found in playerCards[${playerClass}]`);
+      continue;
+    }
+    startCards.push(tpl);
+  }
+
+  // Create the deck from explicit list (each entry is one copy)
+  // If your createDeck clones + assigns unique ids, pass count = 1
+  const deck = createDeck(startCards, 1);
 
   return {
     class: playerClass,
-    health: 50,
-    maxHealth: 50,
-    energy: 3,
-    maxEnergy: 3,
+    health: cls?.health ?? 50,
+    maxHealth: cls?.health ?? 50,
+    energy: cls?.energy ?? 3,
+    maxEnergy: cls?.energy ?? 3,
     deck,
     passives: [],
-    level: 1
+    level: 1,
   };
 }
 
@@ -1054,17 +998,18 @@ function playOneCard(
       opponent: newOpponent,
       log,
     }) as any;
+    dbg('Damage resolution result:', dmgRes);
 
     // Prefer a returned flag if you add one; fallback to log sniffing
-    damageLanded =
-      !!dmgRes?.damageApplied ||
-      (/(?:deals\s+([1-9]\d*)\s+damage)/.test(log[log.length - 1] || '') &&
-       !/Evasive prevented damage/.test(log[log.length - 1] || ''));
+    damageLanded = dmgRes.dealt > 0;
   }
 
   // 5) Effects (only if no attack OR attack actually landed)
+  dbg('Running card effects for:', playedCard.name);
   const canRunEffects = !(playedCard.attack && playedCard.attack > 0) || damageLanded;
+  dbg('Can run effects (no attack or attack landed):', canRunEffects);
   if (canRunEffects && (playedCard as any).effects) {
+    dbg('Card has effects, executing:', (playedCard as any).effects);
     runCardEffects(
       playedCard as Card & { effects?: EffectInstance[] },
       { side, player: newPlayer, opponent: newOpponent, state: newBattleState, log },

@@ -17,7 +17,7 @@ import { SplashScreen } from './game/shared/SplashScreen';
 import { StartingSplashScreen } from './game/shared/StartingSplashScreen';
 import { OpponentCardPreview } from './game/battle/OpponentCardPreview';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { GamePhase, PlayerClass, Difficulty, Turn, Player } from '@/types/game';
+import { GamePhase, PlayerClass, Difficulty, Turn, Player, Opponent } from '@/types/game';
 import { OpponentAI } from '@/logic/game/OpponentAI';
 import { playerClasses } from '@/data/gameData';
 import { db } from '@/lib/db';
@@ -272,54 +272,67 @@ export default function Game() {
 
   }
 
-const startNextTurn = (newTurn: any) => {
+  const startNextTurn = (newTurn: any) => {
+    if (newTurn.newBattleState.turn === Turn.OPPONENT) {
+      // Replenish opponent energy to max before start-of-turn triggers
+      try {
+        const bsWithEnergy = { ...newTurn.newBattleState } as any;
+        const opp = newTurn.newOpponent as Opponent;
+        const maxOppEnergy = opp.maxEnergy;
   
-  if (newTurn.newBattleState.turn === Turn.OPPONENT) {
-    // Replenish opponent energy to its max before start-of-turn triggers
-    try {
-      const bsWithEnergy = { ...newTurn.newBattleState } as any;
-      const opp = newTurn.newOpponent as any;
-      const maxOppEnergy =
-        (opp && (opp.maxEnergy ?? opp.energyMax)) ??
-        (newTurn.newBattleState as any)?.opponentMaxEnergy ??
-        (newTurn.newBattleState as any)?.maxOpponentEnergy ??
-        (newTurn.newBattleState as any)?.opponentEnergyMax ??
-        bsWithEnergy.opponentEnergy;
-
-      if (typeof maxOppEnergy === 'number' && Number.isFinite(maxOppEnergy)) {
-        bsWithEnergy.opponentEnergy = maxOppEnergy;
-        dbg('Replenished opponent energy to', maxOppEnergy);
-        updateBattleState(bsWithEnergy);
+        if (typeof maxOppEnergy === 'number' && Number.isFinite(maxOppEnergy)) {
+          bsWithEnergy.opponentEnergy = maxOppEnergy;
+          dbg('Replenished opponent energy to', maxOppEnergy);
+          updateBattleState(bsWithEnergy);
+        }
+  
+        const started = GameEngine.startTurn?.(
+          'opponent',
+          newTurn.newPlayer,
+          newTurn.newOpponent,
+          bsWithEnergy
+        );
+        if (started?.battleState) {
+          updateBattleState(started.battleState);
+          updatePlayer(started.player ?? newTurn.newPlayer);
+          updateOpponent(started.opponent ?? newTurn.newOpponent);
+        }
+      } catch (err) {
+        dbg('startTurn(opponent) after player endTurn failed:', err as any);
       }
-
-      // Prepare the opponent's start-of-turn (draws + triggers), then run the AI loop.
-      const started = GameEngine.startTurn?.('opponent', newTurn.newPlayer, newTurn.newOpponent, bsWithEnergy);
-      if (started && started.battleState) {
-        updateBattleState(started.battleState);
-        updatePlayer(started.player ?? newTurn.newPlayer);
-        updateOpponent(started.opponent ?? newTurn.newOpponent);
+      setTimeout(() => {
+        playOpponentTurn();
+      }, 300);
+    } else {
+      // Replenish player energy to max before start-of-turn triggers
+      try {
+        const bsWithEnergy = { ...newTurn.newBattleState } as any;
+        const ply = newTurn.newPlayer as Player;
+        const maxPlayerEnergy = ply.maxEnergy;
+  
+        if (typeof maxPlayerEnergy === 'number' && Number.isFinite(maxPlayerEnergy)) {
+          bsWithEnergy.playerEnergy = maxPlayerEnergy;
+          dbg('Replenished player energy to', maxPlayerEnergy);
+          updateBattleState(bsWithEnergy);
+        }
+  
+        const started = GameEngine.startTurn?.(
+          'player',
+          newTurn.newPlayer,
+          newTurn.newOpponent,
+          bsWithEnergy
+        );
+        if (started?.battleState) {
+          updateBattleState(started.battleState);
+          updatePlayer(started.player ?? newTurn.newPlayer);
+          updateOpponent(started.opponent ?? newTurn.newOpponent);
+        }
+      } catch (err) {
+        dbg('startTurn(player) after opponent endTurn failed:', err as any);
       }
-    } catch (err) {
-      dbg('startTurn(opponent) after player endTurn failed:', err as any);
     }
-    setTimeout(() => {
-      playOpponentTurn();
-    }, 300);
-  } else {
-    // Prepare the player's start-of-turn (draws + triggers)
-    try {
-      const started = GameEngine.startTurn?.('player', newTurn.newPlayer, newTurn.newOpponent, newTurn.newBattleState);
-      if (started && started.battleState) {
-        updateBattleState(started.battleState);
-        updatePlayer(started.player ?? newTurn.newPlayer);
-        updateOpponent(started.opponent ?? newTurn.newOpponent);
-      }
-    } catch (err) {
-      dbg('startTurn(player) after opponent endTurn failed:', err as any);
-    }
-  }
-
-}
+  };
+  
 
   const handleEndTurn = async () => {
     dbg('handleEndTurn called');

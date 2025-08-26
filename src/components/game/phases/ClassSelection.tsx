@@ -64,6 +64,7 @@ export const ClassSelection: React.FC<ClassSelectionProps> = ({
                 <p className="text-sm text-muted-foreground mb-4">
                   {classData.description}
                 </p>
+                {/*
                 <div className="space-y-2">
                   <h4 className="font-semibold card-title">Starting Cards:</h4>
                   <div className="space-y-1">
@@ -72,6 +73,7 @@ export const ClassSelection: React.FC<ClassSelectionProps> = ({
                     ))}
                   </div>
                 </div>
+                */}
                 {!classData.available && (
                   <div className="mt-4 text-xs text-red-600 font-semibold">
                     This class is not available yet
