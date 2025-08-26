@@ -1,5 +1,5 @@
 import { dbg } from '@/lib/debug';
-import { BattleState, Card, CardType, Deck, DrawModification, Rarity, GameState, Turn, Opponent, Player, PlayerClass, OpponentType, DrawModType, Difficulty, TriggerPhase, Passive } from '@/types/game';
+import { BattleState, Card, CardType, Deck, DrawModification, Rarity, GameState, Turn, Opponent, Player, PlayerClass, OpponentType, DrawModType, Difficulty, TriggerPhase, Passive, CardTrigger } from '@/types/game';
 import { ActiveMod, MOD_DEFS, ModType } from "@/content/modules/mods";
 import { MOD_DEFAULT_EFFECTS } from "@/content/modules/mods";
 import { EffectInstance } from "@/content/modules/effects";
@@ -7,7 +7,6 @@ import { EffectCode } from "@/content/modules/effects";
 import * as gameData from '@/data/gameData';
 import { runCardEffects } from '@/content/modules/effects';
 import { consumeModStacks } from '@/logic/core/StatusManager';
-import { db } from './db';
 
 
 dbg('gameUtils.ts loaded');
@@ -92,6 +91,7 @@ function runModEffectsForPhase(
         rarity: Rarity.COMMON,
         types: [],
         effects: [{ ...eff, params }],
+        trigger: CardTrigger.ONPLAY
       };
       runCardEffects(pseudo, { side, player, opponent, state, log }, log);
     }
@@ -319,6 +319,7 @@ export function calculateDamageWithStatusEffects(
     types: card?.types ? [...(card.types || [])] : [],
     attack: Math.max(0, damage),
     effects: [],
+    trigger: CardTrigger.ONPLAY
   };
 
   // Helpers to collect effects from passives/mods for a specific side & phase
@@ -709,6 +710,7 @@ function runTriggeredEffectsForPhase(
       rarity: Rarity.COMMON,
       types: [],
       effects: [eff],
+      trigger: CardTrigger.ONPLAY
     };
     runCardEffects(pseudo, { side, player, opponent, state, log }, log);
   }
@@ -1146,10 +1148,10 @@ export function opponentPlayCard(
 function drawHandDeckInternal(
   deck: Deck,
   discardPile: Card[],
+  state: BattleState,
   numCards: number = 1,
   side: 'player' | 'opponent' = 'player',
-  playerClass: PlayerClass = PlayerClass.WARRIOR,
-  opponentName: string = 'Alpha Wolf'
+  ctx?: { player?: Player; opponent?: Opponent; log?: string[] }
 ): { drawnCards: Card[], updatedDeck: Deck, updatedDiscardPile: Card[], minionDamageLog: string[] } {
   const drawnCards: Card[] = [];
   let currentDeck = { ...deck };
@@ -1169,18 +1171,26 @@ function drawHandDeckInternal(
     }
 
     const drawnCard = currentDeck.cards.shift()!;
+    drawnCards.push(drawnCard);
 
-    // Check if this is a Wolf minion card
-    if (drawnCard.types?.includes(CardType.MINION) && drawnCard.unplayable && /wolf_minion/.test(drawnCard.id)) {
-      const damage = drawnCard.attack || 5;
-      minionDamageLog.push(formatLogText(
-        `${side === 'player' ? playerClass : opponentName} drew Wolf and takes ${damage} damage`,
-        playerClass,
-        opponentName
-      ));
-      drawnCards.push(drawnCard);
-    } else {
-      drawnCards.push(drawnCard);
+    // Execute ONDRAW triggers immediately if present
+    if ((drawnCard as any).trigger === CardTrigger.ONDRAW && (drawnCard as any).effects?.length) {
+      const player = ctx?.player;
+      const opponent = ctx?.opponent;
+      const logSink = ctx?.log ?? [];
+
+      if (state && player && opponent) {
+        try {
+          runCardEffects(
+            drawnCard as Card & { effects?: EffectInstance[] },
+            { side, state, player, opponent, log: logSink },
+            logSink
+          );
+          dbg(`Executed ONDRAW effects for card: ${drawnCard.name}`);
+        } catch (e) {
+          dbg('Error executing ONDRAW effects for', drawnCard.name, e as any);
+        }
+      }
     }
   }
 
@@ -1208,11 +1218,10 @@ export function drawHand(...args: any[]): any {
     const res = drawHandDeckInternal(
       state[deckKey],
       state[discardKey],
+      state,
       drawCount,
       side,
-      // use the real player/opponent names for better logs
-      (state as any).playerClass || (args[3]?.playerClass) || PlayerClass.WARRIOR,
-      (args[3]?.opponentName) || who
+      args[3] // pass optional context: { player, opponent, log }
     );
 
     // Commit results to state
@@ -1228,53 +1237,7 @@ export function drawHand(...args: any[]): any {
     return res.drawnCards;
   }
 
-  // Deck-based legacy signature passthrough
-  return drawHandDeckInternal.apply(null, args as any);
 }
-
-/**
- * Simpler side-based drawCards wrapper for GameEngine.startTurn fallback.
- */
-export function drawCards(side: 'player' | 'opponent', numCards: number, state: BattleState): Card[] {
-  return drawHand(side, numCards, state);
-}
-
-export function drawCardsWithReshuffle(
-  deck: Deck, 
-  discardPile: Card[], 
-  numCards: number = 1
-): { drawnCards: Card[], updatedDeck: Deck, updatedDiscardPile: Card[] } {
-  const drawnCards: Card[] = [];
-  let currentDeck = { ...deck };
-  let currentDiscardPile = [...discardPile];
-  
-  for (let i = 0; i < numCards; i++) {
-    if (currentDeck.cards.length === 0) {
-      // Shuffle discard pile back into deck
-      if (currentDiscardPile.length > 0) {
-        currentDeck.cards = shuffleDeck([...currentDiscardPile]);
-        currentDiscardPile = [];
-        dbg('Deck empty, shuffled discard pile back into deck');
-      } else {
-        dbg('No cards left to draw');
-        break;
-      }
-    }
-    
-    if (currentDeck.cards.length > 0) {
-      const card = currentDeck.cards.shift()!;
-      drawnCards.push(card);
-      dbg(`Drew card: ${card.name}`);
-    }
-  }
-  
-  return {
-    drawnCards,
-    updatedDeck: currentDeck,
-    updatedDiscardPile: currentDiscardPile
-  };
-}
-
 
 export function getRandomCards(playerClass: PlayerClass, count: number = 3): Card[] {
   const classCards = playerCards[playerClass];

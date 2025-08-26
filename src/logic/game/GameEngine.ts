@@ -149,7 +149,11 @@ export class GameEngine {
     let drawn: Card[] = [];
     if (typeof drawHand === 'function') {
       // unified util: draw based on active side and battle state
-      const res = drawHand(side, drawCount, battleState);
+      const res = drawHand(side, drawCount, battleState, {
+        player,
+        opponent,
+        log: battleState?.battleLog ?? []
+      });
       drawn = res.drawnCards ?? [];
       // util is expected to update battleState's decks/hand, but ensure hand push as fallback
       if (!res.appliedToState) {

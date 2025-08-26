@@ -1,6 +1,7 @@
-import { Card, PlayerClass, OpponentType, CardType, Rarity } from '@/types/game';
+import { Card, PlayerClass, OpponentType, CardType, Rarity, CardTrigger } from '@/types/game';
 import { ModType } from "./mods";
 import { EffectCode } from "./effects";
+
 
 // Base card definitions for each player class.  Adding new cards is as simple
 // as appending to the appropriate array here.
@@ -14,7 +15,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 6,
       class: PlayerClass.WARRIOR,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'warrior_defend',
@@ -24,7 +26,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       defense: 5,
       class: PlayerClass.WARRIOR,
       rarity: Rarity.COMMON,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'warrior_bash',
@@ -37,7 +40,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       ],
       class: PlayerClass.WARRIOR,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'warrior_riposte',
@@ -47,7 +51,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 8,
       class: PlayerClass.WARRIOR,
       rarity: Rarity.RARE,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'warrior_shield_up',
@@ -57,7 +62,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       defense: 8,
       class: PlayerClass.WARRIOR,
       rarity: Rarity.RARE,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'warrior_press_the_attack',
@@ -67,7 +73,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 12,
       class: PlayerClass.WARRIOR,
       rarity: Rarity.RARE,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     }
   ],
   rogue: [
@@ -79,7 +86,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 6,
       class: PlayerClass.ROGUE,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'rogue_defend',
@@ -89,7 +97,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       defense: 5,
       class: PlayerClass.ROGUE,
       rarity: Rarity.COMMON,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'rogue_backstab',
@@ -99,7 +108,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 10,
       class: PlayerClass.ROGUE,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'rogue_poison',
@@ -111,7 +121,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       ],
       class: PlayerClass.ROGUE,
       rarity: Rarity.RARE,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'rogue_dagger_throw',
@@ -121,7 +132,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 4,
       class: PlayerClass.ROGUE,
       rarity: Rarity.RARE,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'rogue_stealth',
@@ -134,7 +146,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       ],
       class: PlayerClass.ROGUE,
       rarity: Rarity.RARE,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     }
   ],
   wizard: [
@@ -146,7 +159,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 6,
       class: PlayerClass.WIZARD,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'wizard_defend',
@@ -156,7 +170,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       defense: 5,
       class: PlayerClass.WIZARD,
       rarity: Rarity.COMMON,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'wizard_zap',
@@ -166,7 +181,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 8,
       class: PlayerClass.WIZARD,
       rarity: Rarity.COMMON,
-      types: [CardType.ATTACK]
+      types: [CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'wizard_fireball',
@@ -176,7 +192,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       attack: 14,
       class: PlayerClass.WIZARD,
       rarity: Rarity.RARE,
-      types: [CardType.ATTACK]
+      types: [CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'wizard_frost_shield',
@@ -189,7 +206,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       ],
       class: PlayerClass.WIZARD,
       rarity: Rarity.RARE,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'wizard_arcane_power',
@@ -198,7 +216,8 @@ export const playerCards: Record<PlayerClass, Card[]> = {
       cost: 1,
       class: PlayerClass.WIZARD,
       rarity: Rarity.RARE,
-      types: [CardType.POWER]
+      types: [CardType.POWER],
+      trigger: CardTrigger.ONPLAY,
     }
   ]
 };
@@ -216,7 +235,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 7,
       class: OpponentType.BEAST,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'beast_bite',
@@ -229,7 +249,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       ],
       class: OpponentType.BEAST,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'beast_howl',
@@ -241,7 +262,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       ],
       class: OpponentType.BEAST,
       rarity: Rarity.RARE,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'beast_pack_mentality',
@@ -261,7 +283,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
           class: OpponentType.BEAST,
           rarity: Rarity.SPECIAL,
           types: [CardType.MINION],
-          unplayable: true
+          unplayable: true,
+          trigger: CardTrigger.ONDRAW,
         }
       ],
       effects: [
@@ -269,7 +292,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       ],
       class: OpponentType.BEAST,
       rarity: Rarity.RARE,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'beast_hunters_instinct',
@@ -282,7 +306,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       ],
       class: OpponentType.BEAST,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     }
   ],
   goblin: [
@@ -296,7 +321,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       ],
       class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'goblin_slingshot',
@@ -306,7 +332,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 6,
       class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
-      types: [CardType.RANGED, CardType.ATTACK]
+      types: [CardType.RANGED, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'goblin_bite',
@@ -316,7 +343,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 6,
       class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'goblin_cower',
@@ -328,7 +356,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       ],
       class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'goblin_booby_trap',
@@ -338,7 +367,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 10,
       class: OpponentType.GOBLIN,
       rarity: Rarity.COMMON,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     }
   ],
   undead: [
@@ -350,7 +380,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 5,
       class: OpponentType.UNDEAD,
       rarity: Rarity.COMMON,
-      types: [CardType.ATTACK]
+      types: [CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'undead_curse',
@@ -362,7 +393,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       ],
       class: OpponentType.UNDEAD,
       rarity: Rarity.COMMON,
-      types: [CardType.CURSE]
+      types: [CardType.CURSE],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'undead_summon',
@@ -372,7 +404,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 12,
       class: OpponentType.UNDEAD,
       rarity: Rarity.RARE,
-      types: [CardType.POWER]
+      types: [CardType.POWER],
+      trigger: CardTrigger.ONPLAY,
     }
   ],
   warrior: [
@@ -384,7 +417,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 7,
       class: OpponentType.WARRIOR,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'enemy_warrior_shield',
@@ -394,7 +428,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       defense: 8,
       class: OpponentType.WARRIOR,
       rarity: Rarity.COMMON,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'enemy_warrior_whirlwind',
@@ -404,7 +439,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 5,
       class: OpponentType.WARRIOR,
       rarity: Rarity.RARE,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     }
   ],
   rogue: [
@@ -416,7 +452,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 6,
       class: OpponentType.ROGUE,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'enemy_rogue_poison',
@@ -426,7 +463,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 4,
       class: OpponentType.ROGUE,
       rarity: Rarity.COMMON,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'enemy_rogue_shadow',
@@ -436,7 +474,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 12,
       class: OpponentType.ROGUE,
       rarity: Rarity.RARE,
-      types: [CardType.MELEE, CardType.ATTACK]
+      types: [CardType.MELEE, CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     }
   ],
   wizard: [
@@ -448,7 +487,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 5,
       class: OpponentType.WIZARD,
       rarity: Rarity.COMMON,
-      types: [CardType.ATTACK]
+      types: [CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'enemy_wizard_shield',
@@ -458,7 +498,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       defense: 7,
       class: OpponentType.WIZARD,
       rarity: Rarity.COMMON,
-      types: [CardType.SKILL]
+      types: [CardType.SKILL],
+      trigger: CardTrigger.ONPLAY,
     },
     {
       id: 'enemy_wizard_bolt',
@@ -468,7 +509,8 @@ export const opponentCards: Record<OpponentType, Card[]> = {
       attack: 11,
       class: OpponentType.WIZARD,
       rarity: Rarity.RARE,
-      types: [CardType.ATTACK]
+      types: [CardType.ATTACK],
+      trigger: CardTrigger.ONPLAY,
     }
   ],
   [OpponentType.MONSTER]: []

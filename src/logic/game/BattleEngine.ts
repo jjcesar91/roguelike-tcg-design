@@ -46,6 +46,7 @@ export class BattleEngine {
       maxHealth: baseOpp.maxHealth ?? baseOpp.health,
       energy: 2,
       maxEnergy: 2,
+      cardsDrawn: baseOpp.cardsDrawn,
       portrait: baseOpp.portrait,
       deck: { cards: oppDeck, discardPile: [] },
       difficulty: baseOpp.difficulty,

@@ -14,6 +14,13 @@ export enum CardType {
   SPELL = 'spell',
 }
 
+export enum CardTrigger {
+  ONDRAW,
+  ONPLAY,
+  ONDISCARD,
+  ONBURN,
+}
+
 export enum TriggerPhase {
   BATTLEBEGIN = 'battleBegin',
   BEFOREDRAW = 'beforeDraw',
@@ -62,12 +69,13 @@ export interface Card {
   cost: number;
   attack?: number;
   defense?: number;
-  effects?: EffectInstance[]; 
+  effects?: EffectInstance[];
   related_cards?: Card[];
   class: PlayerClass | OpponentType;
   rarity: Rarity;
   types?: CardType[];
   unplayable?: boolean;
+  trigger: CardTrigger;
 }
 
 export interface Passive {
