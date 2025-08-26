@@ -14,8 +14,10 @@ export const MOD_DEFS: Record<ModType, {
   maxStacks: number;
   defaultDuration: number; // applyMod can use this if caller omits duration
   stackMode: 'add' | 'replace'; // how stacks behave on reapply
+  /** If true, tickMods will NOT decrement duration for this mod (non-decaying). */
+  noDecayOnTick?: boolean;
 }> = {
-  [ModType.BLEEDING]: { maxStacks: 5, defaultDuration: 2, stackMode: 'add' },
+  [ModType.BLEEDING]: { maxStacks: 5, defaultDuration: 2, stackMode: 'add', noDecayOnTick: true },
   [ModType.EVASIVE]: { maxStacks: 3, defaultDuration: 2, stackMode: 'add' },
   [ModType.WEAK]: { maxStacks: 1, defaultDuration: 2, stackMode: 'replace' },
   [ModType.VULNERABLE]: { maxStacks: 1, defaultDuration: 2, stackMode: 'replace' },

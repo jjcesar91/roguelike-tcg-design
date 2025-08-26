@@ -583,11 +583,25 @@ export function applyMod(mods: ActiveMod[], type: ModType, stacksDelta = 1, dura
   return next;
 }
 
-// Decrement duration and remove expired — no special-cases needed.
-export function tickMods(mods: ActiveMod[]): ActiveMod[] {
-  return mods
-    .map(m => ({ ...m, duration: Math.max(0, m.duration - 1) }))
-    .filter(m => m.duration > 0 && m.stacks > 0);
+// Tick down mod durations, respecting noDecayOnTick property in MOD_DEFS.
+export function tickMods(mods: ActiveMod[] = []): ActiveMod[] {
+  return (mods || [])
+    .map((m) => {
+      const def = MOD_DEFS[m.type];
+      if (def?.noDecayOnTick) {
+        // Do not decrement duration for non-decaying mods
+        return m;
+      }
+      const nextDuration = Math.max(0, (m.duration ?? 0) - 1);
+      return { ...m, duration: nextDuration };
+    })
+    .filter((m) => {
+      const def = MOD_DEFS[m.type];
+      // Non-decaying mods are never auto-removed by tick (only stacks reaching 0 removes them)
+      if (def?.noDecayOnTick) return m.stacks > 0;
+      // For normal mods, remove when duration hits 0 or stacks are 0
+      return (m.duration ?? 0) > 0 && m.stacks > 0;
+    });
 }
 
 export function shuffleCardsIntoDeck(deck: Deck, cardsToAdd: Card[]): Deck {
