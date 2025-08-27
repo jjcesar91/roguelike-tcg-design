@@ -18,6 +18,8 @@ import { StartingSplashScreen } from './game/shared/StartingSplashScreen';
 import { OpponentCardPreview } from './game/battle/OpponentCardPreview';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { GamePhase, PlayerClass, Difficulty, Turn, Player, Opponent } from '@/types/game';
+import { DarkForestPath, getOpponentsByDifficulty } from '@/content/modules/path';
+import { DifficultyLevel } from '@/types/path';
 import { OpponentAI } from '@/logic/game/OpponentAI';
 import { playerClasses } from '@/data/gameData';
 import { db } from '@/lib/db';
@@ -65,6 +67,9 @@ export default function Game() {
   } = useModalState();
 
 
+  // Stato del percorso (path) della run
+  const [currentPath, setCurrentPath] = React.useState(DarkForestPath);
+
   const handleClassSelect = (playerClass: PlayerClass) => {
     try {
       dbg('🚀 handleClassSelect called with:', playerClass);
@@ -74,8 +79,65 @@ export default function Game() {
       updatePlayer(init.player);
       setSelectedClass(playerClass);
 
-      // 2) Start the first battle at BASIC difficulty via centralized flow
-      startBattleWithSplash(init.player,Difficulty.BASIC);
+      // 2) Inizializza il path "Dark forest" e avvia la prima encounter
+      setCurrentPath({ ...DarkForestPath, current: 0 });
+
+      // 3) Prendi la prima encounter (sempre battle D1)
+      const firstEncounter = DarkForestPath.encounters[0];
+      const d1Opponents = getOpponentsByDifficulty(DifficultyLevel.D1);
+      const random = Math.floor(Math.random() * d1Opponents.length);
+      const chosen = d1Opponents[random];
+
+      // Usa la factory esistente per creare l'opponent completo (usando id)
+      // Trova l'opponent completo tra quelli in gameData
+      const allOpponents = require('@/data/gameData').getAllOpponents();
+      const fullOpponent = allOpponents.find((o: any) => o.id === chosen.id);
+      if (!fullOpponent) throw new Error('No valid opponent found for D1');
+
+      // Crea la battaglia con l'opponent selezionato
+      const { battleState } = GameEngine.createBattle(init.player, fullOpponent.difficulty);
+      updateOpponent(fullOpponent);
+      updateBattleState(battleState);
+
+      showBattleSplash(fullOpponent, async () => {
+        setGamePhase(GamePhase.BATTLE);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        await sleep(500);
+
+        try {
+          const st = gameStateRef.current;
+          const p = st?.player;
+          const o = st?.currentOpponent;
+          const bs = st?.battleState;
+          if (!p || !o || !bs) return;
+
+          // Re-read state after engine hooks
+          const turn = st.battleState?.turn;
+
+          // Start-of-turn pipeline for the side who begins
+          if (turn === Turn.OPPONENT || turn === Turn.PLAYER) {
+            const side = turn === Turn.OPPONENT ? 'opponent' : 'player';
+            try {
+              const started = GameEngine.startTurn?.(side, st.player!, st.currentOpponent!, st.battleState!);
+              if (started?.battleState) {
+                updateBattleState(started.battleState);
+                updatePlayer(started.player ?? st.player!);
+                updateOpponent(started.opponent ?? st.currentOpponent!);
+              }
+            } catch (err) {
+              dbg(`startTurn(${side}) at battle begin failed:`, err as any);
+            }
+          }
+
+          // If opponent starts, immediately trigger AI loop
+          if (turn === Turn.OPPONENT) {
+            dbg('Opponent starts — triggering AI turn');
+            try { await playOpponentTurn(); } catch (e) { dbg('AI loop error:', e); }
+          }
+        } catch (e) {
+          dbg('battleBegin error:', e as any);
+        }
+      });
     } catch (error) {
       console.error('❌ Error in handleClassSelect:', error);
     }
