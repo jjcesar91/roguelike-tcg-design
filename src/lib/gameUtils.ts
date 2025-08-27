@@ -215,9 +215,13 @@ export function initializeBattle(player: Player, opponent: Opponent): BattleStat
   dbg('Opponent deck cards:', opponent.deck?.cards);
   dbg('Opponent passives:', opponent.passives);
 
-  // Create copies of decks for battle
+  // Create copies of decks for battle (ensure unique per-instance card ids)
+  const stamp = Date.now();
   const playerDeckCopy = {
-    cards: [...player.deck.cards],
+    cards: player.deck.cards.map((card, i) => ({
+      ...card,
+      id: `${card.id}__copy_${stamp}_${i}`,
+    })),
     discardPile: [...player.deck.discardPile]
   };
   const opponentDeckCopy = {

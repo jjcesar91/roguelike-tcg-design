@@ -155,7 +155,7 @@ export const PlayerHUD: React.FC<PlayerHUDProps> = ({
             {battleState.playerHand.map((card, index) => {
               return (
                 <div 
-                  key={`${card.id}-${index}`} 
+                  key={`${card.id}`} 
                   className="flex flex-col bg-gradient-to-b from-gray-800/95 to-gray-900/98 backdrop-blur-sm rounded border border-gray-700/70 p-1 min-w-[96px] max-w-[96px] hover:from-gray-700/95 hover:to-gray-800/98 cursor-pointer transition-all shadow-lg relative overflow-hidden"
                   style={{ 
                     marginLeft: index === 0 ? '0px' : '-30px',
