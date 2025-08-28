@@ -42,7 +42,7 @@ export const StartingSplashScreen: React.FC<StartingSplashScreenProps> = ({
     >
       <div className="w-full h-full flex items-center justify-center p-4 md:p-8 lg:p-12 relative">
         <img
-          src="https://i.imgur.com/qESwpq9.png"
+          src="https://i.imgur.com/f8z9ye7.jpeg"
           alt="Game Splash Art"
           className="max-w-full max-h-full object-contain transform scale-90 md:scale-100 lg:scale-110"
           style={{
