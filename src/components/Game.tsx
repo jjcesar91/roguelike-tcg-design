@@ -15,16 +15,62 @@ import { DefeatScreen } from './game/phases/DefeatScreen';
 import { BattlePhase } from './game/battle/BattlePhase';
 import { SplashScreen } from './game/shared/SplashScreen';
 import { StartingSplashScreen } from './game/shared/StartingSplashScreen';
+import MainMenuView from './game/shared/MainMenuView';
+import { PathSplashScreen } from './game/shared/PathSplashScreen';
 import { OpponentCardPreview } from './game/battle/OpponentCardPreview';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { GamePhase, PlayerClass, Difficulty, Turn, Player, Opponent } from '@/types/game';
 import { DarkForestPath, getOpponentsByDifficulty } from '@/content/modules/path';
-import { DifficultyLevel } from '@/types/path';
+import { DifficultyLevel, EncounterType } from '@/types/path';
 import { OpponentAI } from '@/logic/game/OpponentAI';
 import { playerClasses } from '@/data/gameData';
 import { db } from '@/lib/db';
 
 export default function Game() {
+  // Stato per splash, menu e selezione classe
+  const [showSplash, setShowSplash] = React.useState(true);
+  const [showMainMenu, setShowMainMenu] = React.useState(false);
+  const [showClassSelection, setShowClassSelection] = React.useState(false);
+
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+    setShowMainMenu(true);
+  };
+  const handleNewGame = () => {
+    setShowMainMenu(false);
+    setShowClassSelection(true);
+  };
+  // Handler per la selezione classe (spostato sopra il render condizionale)
+  const handleClassSelect = (playerClass: PlayerClass) => {
+    try {
+      dbg('🚀 handleClassSelect called with:', playerClass);
+      // 1) Initialize the run (player only)
+      const init = GameEngine.initRun(playerClass);
+      updatePlayer(init.player);
+      setSelectedClass(playerClass);
+      setCurrentPath({ ...DarkForestPath });
+      setShowPathSplash(true);
+      setShowClassSelection(false);
+    } catch (error) {
+      console.error('❌ Error in handleClassSelect:', error);
+    }
+  };
+
+  // Render condizionale: splash -> main menu -> class selection
+  if (showSplash) {
+    return <StartingSplashScreen isVisible={showSplash} onComplete={handleSplashComplete} />;
+  }
+  if (showMainMenu) {
+    return <MainMenuView onNewGame={handleNewGame} />;
+  }
+  if (showClassSelection) {
+    return (
+      <ClassSelection
+        onClassSelect={handleClassSelect}
+        availableClasses={Object.keys(playerClasses) as PlayerClass[]}
+      />
+    );
+  }
   const {
     gameState,
     gameStateRef,
@@ -69,78 +115,69 @@ export default function Game() {
 
   // Stato del percorso (path) della run
   const [currentPath, setCurrentPath] = React.useState(DarkForestPath);
+  const [showPathSplash, setShowPathSplash] = React.useState(false);
 
-  const handleClassSelect = (playerClass: PlayerClass) => {
-    try {
-      dbg('🚀 handleClassSelect called with:', playerClass);
+  // (già dichiarato sopra per il main menu)
 
-      // 1) Initialize the run (player only)
-      const init = GameEngine.initRun(playerClass);
-      updatePlayer(init.player);
-      setSelectedClass(playerClass);
+  // Avvia la prima encounter dopo il tap sulla path splash
+  const handlePathSplashComplete = () => {
+    setShowPathSplash(false);
+    // Prendi la prima encounter di tipo BATTLE
+    const firstBattle = DarkForestPath.encounters.find((e: any) => e.type === 'battle' || e.type === 0 || e.type === EncounterType.BATTLE);
+    if (!firstBattle) throw new Error('No battle encounter found in path');
+    const diffLevel = firstBattle.difficultyLevel || DifficultyLevel.D1;
+    const opponents = getOpponentsByDifficulty(diffLevel);
+    if (!opponents.length) throw new Error('No valid opponent found for this difficulty');
+    const random = Math.floor(Math.random() * opponents.length);
+    const chosen = opponents[random];
+    const allOpponents = require('@/data/gameData').getAllOpponents();
+    const fullOpponent = allOpponents.find((o: any) => o.id === chosen.id);
+    if (!fullOpponent) throw new Error('No valid opponent found for this encounter');
 
-      // 2) Inizializza il path "Dark forest" e avvia la prima encounter
-      setCurrentPath({ ...DarkForestPath, current: 0 });
+    // Crea la battaglia con l'opponent selezionato
+  const { battleState } = GameEngine.createBattle(gameStateRef.current.player!, fullOpponent.difficulty);
+    updateOpponent(fullOpponent);
+    updateBattleState(battleState);
 
-      // 3) Prendi la prima encounter (sempre battle D1)
-      const firstEncounter = DarkForestPath.encounters[0];
-      const d1Opponents = getOpponentsByDifficulty(DifficultyLevel.D1);
-      const random = Math.floor(Math.random() * d1Opponents.length);
-      const chosen = d1Opponents[random];
+    showBattleSplash(fullOpponent, async () => {
+      setGamePhase(GamePhase.BATTLE);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      await sleep(500);
 
-      // Usa la factory esistente per creare l'opponent completo (usando id)
-      // Trova l'opponent completo tra quelli in gameData
-      const allOpponents = require('@/data/gameData').getAllOpponents();
-      const fullOpponent = allOpponents.find((o: any) => o.id === chosen.id);
-      if (!fullOpponent) throw new Error('No valid opponent found for D1');
+      try {
+        const st = gameStateRef.current;
+        const p = st?.player;
+        const o = st?.currentOpponent;
+        const bs = st?.battleState;
+        if (!p || !o || !bs) return;
 
-      // Crea la battaglia con l'opponent selezionato
-      const { battleState } = GameEngine.createBattle(init.player, fullOpponent.difficulty);
-      updateOpponent(fullOpponent);
-      updateBattleState(battleState);
+        // Re-read state after engine hooks
+        const turn = st.battleState?.turn;
 
-      showBattleSplash(fullOpponent, async () => {
-        setGamePhase(GamePhase.BATTLE);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        await sleep(500);
-
-        try {
-          const st = gameStateRef.current;
-          const p = st?.player;
-          const o = st?.currentOpponent;
-          const bs = st?.battleState;
-          if (!p || !o || !bs) return;
-
-          // Re-read state after engine hooks
-          const turn = st.battleState?.turn;
-
-          // Start-of-turn pipeline for the side who begins
-          if (turn === Turn.OPPONENT || turn === Turn.PLAYER) {
-            const side = turn === Turn.OPPONENT ? 'opponent' : 'player';
-            try {
-              const started = GameEngine.startTurn?.(side, st.player!, st.currentOpponent!, st.battleState!);
-              if (started?.battleState) {
-                updateBattleState(started.battleState);
-                updatePlayer(started.player ?? st.player!);
-                updateOpponent(started.opponent ?? st.currentOpponent!);
-              }
-            } catch (err) {
-              dbg(`startTurn(${side}) at battle begin failed:`, err as any);
+        // Start-of-turn pipeline for the side who begins
+        if (turn === Turn.OPPONENT || turn === Turn.PLAYER) {
+          const side = turn === Turn.OPPONENT ? 'opponent' : 'player';
+          try {
+            const started = GameEngine.startTurn?.(side, st.player!, st.currentOpponent!, st.battleState!);
+            if (started?.battleState) {
+              updateBattleState(started.battleState);
+              updatePlayer(started.player ?? st.player!);
+              updateOpponent(started.opponent ?? st.currentOpponent!);
             }
+          } catch (err) {
+            dbg(`startTurn(${side}) at battle begin failed:`, err as any);
           }
-
-          // If opponent starts, immediately trigger AI loop
-          if (turn === Turn.OPPONENT) {
-            dbg('Opponent starts — triggering AI turn');
-            try { await playOpponentTurn(); } catch (e) { dbg('AI loop error:', e); }
-          }
-        } catch (e) {
-          dbg('battleBegin error:', e as any);
         }
-      });
-    } catch (error) {
-      console.error('❌ Error in handleClassSelect:', error);
-    }
+
+        // If opponent starts, immediately trigger AI loop
+        if (turn === Turn.OPPONENT) {
+          dbg('Opponent starts — triggering AI turn');
+          try { await playOpponentTurn(); } catch (e) { dbg('AI loop error:', e); }
+        }
+      } catch (e) {
+        dbg('battleBegin error:', e as any);
+      }
+    });
   };
 
   // Small helpers & timing constants
@@ -478,10 +515,20 @@ export default function Game() {
         />
 
         {/* Game Phases */}
-        {gameState.gamePhase === GamePhase.CLASS_SELECTION && (
+        {gameState.gamePhase === GamePhase.CLASS_SELECTION && !showPathSplash && (
           <ClassSelection
             onClassSelect={handleClassSelect}
             availableClasses={Object.keys(playerClasses) as PlayerClass[]}
+          />
+        )}
+        {/* Path Splash Screen */}
+        {showPathSplash && (
+          <PathSplashScreen
+            isVisible={showPathSplash}
+            thumbnail={DarkForestPath.thumbnail}
+            title={DarkForestPath.description}
+            subtitle={DarkForestPath.subtitle}
+            onComplete={handlePathSplashComplete}
           />
         )}
 

@@ -42,37 +42,37 @@
 }
 :root {
   --radius: 0.625rem;
-  --background: #a8966a !important;
-  --foreground: #1a1410 !important;
-  --card: #a8966a !important;
-  --card-foreground: #1a1410 !important;
-  --popover: #a8966a !important;
-  --popover-foreground: #1a1410 !important;
-  --primary: #4a3520 !important;
-  --primary-foreground: #a8966a !important;
-  --secondary: #98865a !important;
-  --secondary-foreground: #1a1410 !important;
-  --muted: #98865a !important;
-  --muted-foreground: #4a3520 !important;
-  --accent: #98865a !important;
-  --accent-foreground: #1a1410 !important;
-  --destructive: #7a2f1f !important;
-  --border: #88764a !important;
-  --input: #88764a !important;
-  --ring: #4a3520 !important;
-  --chart-1: #4a3520 !important;
-  --chart-2: #5a4530 !important;
-  --chart-3: #6a5540 !important;
-  --chart-4: #7a6550 !important;
-  --chart-5: #8a7560 !important;
-  --sidebar: #a8966a !important;
-  --sidebar-foreground: #1a1410 !important;
-  --sidebar-primary: #4a3520 !important;
-  --sidebar-primary-foreground: #a8966a !important;
-  --sidebar-accent: #98865a !important;
-  --sidebar-accent-foreground: #1a1410 !important;
-  --sidebar-border: #88764a !important;
-  --sidebar-ring: #4a3520 !important;
+  --background: #0a0c1a !important; /* blu notte profondo */
+  --foreground: #e0e6f0 !important; /* grigio-azzurro chiaro */
+  --card: #181a2a !important; /* blu scuro */
+  --card-foreground: #e0e6f0 !important;
+  --popover: #181a2a !important;
+  --popover-foreground: #e0e6f0 !important;
+  --primary: #3a3e5a !important; /* blu/viola spento */
+  --primary-foreground: #e0e6f0 !important;
+  --secondary: #23243a !important; /* grigio-blu */
+  --secondary-foreground: #e0e6f0 !important;
+  --muted: #23243a !important;
+  --muted-foreground: #7a7e9a !important; /* grigio-viola */
+  --accent: #4e4a7a !important; /* viola freddo */
+  --accent-foreground: #e0e6f0 !important;
+  --destructive: #5a2f4a !important; /* viola scuro */
+  --border: #23243a !important;
+  --input: #23243a !important;
+  --ring: #4e4a7a !important;
+  --chart-1: #3a3e5a !important;
+  --chart-2: #4e4a7a !important;
+  --chart-3: #23243a !important;
+  --chart-4: #181a2a !important;
+  --chart-5: #0a0c1a !important;
+  --sidebar: #181a2a !important;
+  --sidebar-foreground: #e0e6f0 !important;
+  --sidebar-primary: #3a3e5a !important;
+  --sidebar-primary-foreground: #e0e6f0 !important;
+  --sidebar-accent: #4e4a7a !important;
+  --sidebar-accent-foreground: #e0e6f0 !important;
+  --sidebar-border: #23243a !important;
+  --sidebar-ring: #4e4a7a !important;
 }
 .dark {
   --background: #1a1612;
@@ -113,31 +113,13 @@
   }
   html {
     @apply bg-background text-foreground;
-    background-color: #a8966a !important;
-    background-image: 
-      radial-gradient(circle at 30% 40%, rgba(74, 53, 32, 0.3) 0%, transparent 60%),
-      radial-gradient(circle at 70% 70%, rgba(106, 85, 64, 0.2) 0%, transparent 50%),
-      linear-gradient(45deg, rgba(0, 0, 0, 0.05) 25%, transparent 25%, transparent 75%, rgba(0, 0, 0, 0.05) 75%, rgba(0, 0, 0, 0.05)) !important;
-    background-size: 300% 300%, 300% 300%, 30px 30px !important;
-    background-position: 0% 0%, 100% 100%, 0 0 !important;
-    background-blend-mode: multiply, overlay, multiply !important;
+    background-color: #000 !important;
     position: relative;
     min-height: 100vh;
   }
   html::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: 
-      url("data:image/svg+xml,%3Csvg width='150' height='150' viewBox='0 0 150 150' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='roughPaper'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.02' numOctaves='4' result='noise'/%3E%3CfeColorMatrix in='noise' type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='150' height='150' filter='url(%23roughPaper)' opacity='0.6'/%3E%3C/svg%3E");
-    background-size: 150px 150px;
-    mix-blend-mode: multiply;
-    opacity: 0.7;
-    pointer-events: none;
-    z-index: 1;
+    content: none !important;
+    display: none !important;
   }
   body {
     @apply bg-background text-foreground;
@@ -146,7 +128,7 @@
     min-height: 100vh;
     font-family: var(--font-gothic), serif;
     font-weight: 400;
-    background-color: transparent !important;
+    background-color: #000 !important;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-medieval), cursive;

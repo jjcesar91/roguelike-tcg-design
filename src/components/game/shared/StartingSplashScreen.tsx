@@ -9,55 +9,52 @@ export const StartingSplashScreen: React.FC<StartingSplashScreenProps> = ({
   isVisible,
   onComplete
 }) => {
-  const [showTap, setShowTap] = useState(false);
-  const [canContinue, setCanContinue] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
+  const [blackOpacity, setBlackOpacity] = useState(0); // 0 = trasparente, 1 = nero pieno
 
   useEffect(() => {
     if (!isVisible) return;
-    // Dopo 1.5s mostra il tap
-    const tapTimer = setTimeout(() => {
-      setShowTap(true);
-      setCanContinue(true);
-    }, 1500);
+    setShowIntro(true);
+    setBlackOpacity(0);
+
+    // 1. Mostra logo per 1.2s
+    const logoTimer = setTimeout(() => {
+      // 2. Fade in nero sopra il logo (0.7s)
+      setBlackOpacity(1);
+      // Dopo fade in nero, nascondi logo e chiama onComplete (apre il main menu)
+      setTimeout(() => {
+        setShowIntro(false);
+        onComplete();
+      }, 700);
+    }, 1200);
+
     return () => {
-      clearTimeout(tapTimer);
+      clearTimeout(logoTimer);
     };
-  }, [isVisible]);
+  }, [isVisible, onComplete]);
 
   if (!isVisible) return null;
 
-  const handleContinue = () => {
-    if (canContinue) {
-      setShowTap(false);
-      setCanContinue(false);
-      onComplete();
-    }
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black flex items-center justify-center z-[60] transition-opacity duration-500"
-      onClick={handleContinue}
-      style={{ cursor: canContinue ? 'pointer' : 'default' }}
-    >
-      <div className="w-full h-full flex items-center justify-center p-4 md:p-8 lg:p-12 relative">
-        <img
-          src="https://i.imgur.com/f8z9ye7.jpeg"
-          alt="Game Splash Art"
-          className="max-w-full max-h-full object-contain transform scale-90 md:scale-100 lg:scale-110"
-          style={{
-            maxWidth: '95vw',
-            maxHeight: '95vh'
-          }}
+  // Fase 1: logo intro con overlay nero che sfuma sopra
+  if (showIntro) {
+    return (
+      <div className="fixed inset-0 z-[90]">
+        <div className="absolute inset-0 bg-black flex items-center justify-center z-[91]">
+          <img
+            src="/rekode.png"
+            alt="Rekode Logo"
+            style={{ width: '50vw', maxWidth: 400, minWidth: 120 }}
+            className="transition-all duration-700"
+          />
+        </div>
+        <div
+          className="absolute inset-0 z-[92] bg-black transition-opacity duration-700"
+          style={{ opacity: blackOpacity, pointerEvents: 'none' }}
         />
-        {showTap && (
-          <div className="absolute bottom-10 left-0 w-full flex justify-center">
-            <span className="text-2xl md:text-3xl text-amber-200 animate-pulse font-bold drop-shadow-lg select-none pointer-events-none">
-              Tap to continue
-            </span>
-          </div>
-        )}
       </div>
-    </div>
-  );
+    );
+  }
+
+  // Nessuna splash art: dopo il nero si va direttamente al menu
+  return null;
 };
