@@ -37,10 +37,9 @@ export class GameEngine {
    *
    * While we migrate, this delegates to the OOP BattleEngine to avoid logic duplication.
    */
-  static createBattle(player: Player, difficulty: Difficulty = Difficulty.BASIC) {
-    const opponent: Opponent = getRandomOpponent(difficulty);
+  static createBattle(player: Player, opponent: Opponent) {
     const battleState: BattleState = initializeBattle(player, opponent);
-    return this.battleBegin(player,opponent,battleState);
+    return this.battleBegin(player, opponent, battleState);
   }
 
   /**
@@ -51,6 +50,7 @@ export class GameEngine {
     const playerEffects: EffectInstance[] = [];
     const opponentEffects: EffectInstance[] = [];
 
+    dbg('=== BATTLE BEGIN TRIGGERS ===');
     // Collect player passive effects with trigger BATTLEBEGIN
     for (const passive of player.passives) {
       if (passive.effects) {
@@ -111,6 +111,11 @@ export class GameEngine {
       battleState.turn = Turn.OPPONENT;
     }
 
+    dbg('Player Effects:', playerEffects);
+    dbg('Opponent Effects:', opponentEffects);
+    dbg('Turn order:', battleState.turn === Turn.PLAYER ? 'Player' : 'Opponent');
+    dbg('=============================');
+
     return { player, opponent, battleState };
   }
 
@@ -132,6 +137,7 @@ export class GameEngine {
     opponent: Opponent,
     battleState: BattleState
   ) {
+    dbg('=== START TURN TRIGGERS ===');
     // 1) BEFOREDRAW
     runPhaseForSide?.(TriggerPhase.BEFOREDRAW, {
       side,
