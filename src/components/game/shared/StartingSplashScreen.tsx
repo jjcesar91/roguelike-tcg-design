@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import IntroComics from './IntroComics';
 
 interface StartingSplashScreenProps {
   isVisible: boolean;
@@ -10,28 +11,35 @@ export const StartingSplashScreen: React.FC<StartingSplashScreenProps> = ({
   onComplete
 }) => {
   const [showIntro, setShowIntro] = useState(true);
+  const [showComics, setShowComics] = useState(false);
   const [blackOpacity, setBlackOpacity] = useState(0); // 0 = trasparente, 1 = nero pieno
 
   useEffect(() => {
     if (!isVisible) return;
     setShowIntro(true);
+    setShowComics(false);
     setBlackOpacity(0);
 
     // 1. Mostra logo per 1.2s
     const logoTimer = setTimeout(() => {
       // 2. Fade in nero sopra il logo (0.7s)
       setBlackOpacity(1);
-      // Dopo fade in nero, nascondi logo e chiama onComplete (apre il main menu)
+      // Dopo fade in nero, nascondi logo e mostra i fumetti
       setTimeout(() => {
         setShowIntro(false);
-        onComplete();
+        setShowComics(true);
       }, 700);
     }, 1200);
 
     return () => {
       clearTimeout(logoTimer);
     };
-  }, [isVisible, onComplete]);
+  }, [isVisible]);
+
+  const handleComicsComplete = () => {
+    setShowComics(false);
+    onComplete();
+  };
 
   if (!isVisible) return null;
 
@@ -55,6 +63,11 @@ export const StartingSplashScreen: React.FC<StartingSplashScreenProps> = ({
     );
   }
 
-  // Nessuna splash art: dopo il nero si va direttamente al menu
+  // Fase 2: Mostra i fumetti
+  if (showComics) {
+    return <IntroComics onComplete={handleComicsComplete} />;
+  }
+
+  // Fase 3: Fine della sequenza, passa al menu principale
   return null;
 };
