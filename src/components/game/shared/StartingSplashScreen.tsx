@@ -29,7 +29,7 @@ export const StartingSplashScreen: React.FC<StartingSplashScreenProps> = ({
         setShowIntro(false);
         setShowComics(true);
       }, 700);
-    }, 1200);
+    }, 800);
 
     return () => {
       clearTimeout(logoTimer);
